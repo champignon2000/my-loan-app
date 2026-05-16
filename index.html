@@ -15,7 +15,8 @@
 
     <script type="text/babel">
         const { useState, useEffect } = React;
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx9NARjOg5972eVz6Uirjk4J3IL9p-Y4Y0YLvDI4Ffagdb_TNsh3Zh0rMXX2WF4y8rN/exec";
+        // ⚠️ สลับตรงนี้เป็นลิงก์ Web App ล่าสุดของคุณจาก Google Apps Script นะครับ
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx9NARjOg5972eVz6Uirjk4J3IL9p-Y4Y0YLvDl4Ffagdb_TNsh3Zh0rMXX2WF4y8rN/exec";
 
         function App() {
             const [customers, setCustomers] = useState([]);
@@ -26,11 +27,15 @@
             const [showAddModal, setShowAddModal] = useState(false);
             const [showPayModal, setShowPayModal] = useState(false);
             const [selectedCustomer, setSelectedCustomer] = useState(null);
+            
+            // State สำหรับฟอร์มเพิ่มลูกหนี้
             const [name, setName] = useState("");
             const [loanType, setLoanType] = useState("daily");
             const [principal, setPrincipal] = useState("");
-            const [customCyclePayment, setCustomCyclePayment] = useState("");
-            const [customDays, setCustomDays] = useState("");
+            const [interestRate, setInterestRate] = useState(""); 
+            const [penaltyPerDay, setPenaltyPerDay] = useState(""); // ✨ ฟิลด์กำหนดค่าปรับเอง
+            const [customCyclePayment, setCustomCyclePayment] = useState(""); 
+            const [customDays, setCustomDays] = useState(""); 
             const [payAmount, setPayAmount] = useState("");
 
             useEffect(() => { 
@@ -61,16 +66,20 @@
                         mode: "no-cors",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
-                            action: "addCustomer", name, loanType,
+                            action: "addCustomer", 
+                            name, 
+                            loanType,
                             principal: parseFloat(principal),
-                            customCyclePayment: customCyclePayment ? parseFloat(customCyclePayment) : null,
-                            customDays: customDays ? parseInt(customDays) : null
+                            interestRate: interestRate ? parseFloat(interestRate) : null,
+                            penaltyPerDay: penaltyPerDay ? parseFloat(penaltyPerDay) : 0, // ✨ ส่งยอดค่าปรับไปหลังบ้าน
+                            customCyclePayment: loanType === "custom" ? parseFloat(customCyclePayment) : null, 
+                            customDays: loanType === "custom" ? parseInt(customDays) : null 
                         })
                     });
-                    setName(""); setPrincipal(""); setCustomCyclePayment(""); setCustomDays("");
+                    setName(""); setPrincipal(""); setLoanType("daily"); setInterestRate(""); setPenaltyPerDay(""); setCustomCyclePayment(""); setCustomDays("");
                     setTimeout(fetchData, 1500);
                 } catch (err) { 
-                    alert("เกิดข้อผิดพลาด"); 
+                    alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล"); 
                     setLoading(false); 
                 }
             };
@@ -89,8 +98,47 @@
                     setPayAmount(""); 
                     setTimeout(fetchData, 1500);
                 } catch (err) { 
-                    alert("เกิดข้อผิดพลาด"); 
+                    alert("เกิดข้อผิดพลาดในการชำระเงิน"); 
                     setLoading(false); 
+                }
+            };
+
+            const handleDeleteCustomer = async (id, customerName) => {
+                if (window.confirm(`คุณแน่ใจหรือไม่ที่จะลบรายชื่อคุณ "${customerName}" ออกจากระบบ? ข้อมูลจะหายไปจากตารางชีททั้งหมด`)) {
+                    setLoading(true);
+                    try {
+                        await fetch(SCRIPT_URL, {
+                            method: "POST",
+                            mode: "no-cors",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "deleteCustomer", id: id })
+                        });
+                        setTimeout(fetchData, 1500);
+                    } catch (err) {
+                        alert("เกิดข้อผิดพลาดในการลบข้อมูล");
+                        setLoading(false);
+                    }
+                }
+            };
+
+            // แสดงสถานะเวลา และคำนวณป้ายค่าปรับสะสม
+            const renderStatusBadge = (c) => {
+                const status = c.paymentStatusText || c.status || "";
+                
+                if (status.includes("ล่วงหน้า")) {
+                    return <span class="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md text-[10px] font-bold border border-blue-100 flex items-center gap-1"><i class="fa-solid fa-angles-up"></i> จ่ายล่วงหน้า</span>;
+                } else if (status.includes("ล่าช้า") || status.includes("ค้าง") || status.includes("เกินกำหนด")) {
+                    // หากล่าช้าและมีการตั้งค่าปรับไว้ ให้แสดงยอดปรับสะสมโชว์ด้วย
+                    const fineText = c.accumulatedFine > 0 ? ` (ปรับสะสม +${c.accumulatedFine} บ.)` : " (ค้างส่ง)";
+                    return (
+                        <div class="flex gap-1 flex-wrap">
+                            <span class="bg-rose-50 text-rose-600 px-2 py-0.5 rounded-md text-[10px] font-bold border border-rose-100 flex items-center gap-1"><i class="fa-solid fa-triangle-exclamation animate-pulse"></i> ล่าช้า{fineText}</span>
+                        </div>
+                    );
+                } else if (status.includes("ตามเวลา") || status.includes("ปกติ") || status.includes("ต้องเก็บวันนี้")) {
+                    return <span class="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-amber-100 flex items-center gap-1"><i class="fa-solid fa-clock"></i> ตามเวลา</span>;
+                } else {
+                    return <span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1">{status}</span>;
                 }
             };
 
@@ -104,10 +152,11 @@
 
             return (
                 <div class="max-w-md mx-auto min-h-screen flex flex-col bg-white shadow-xl border-x border-slate-100">
+                    {/* Header */}
                     <div class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-5 shadow-md sticky top-0 z-10 rounded-b-2xl">
                         <div class="flex justify-between items-center mb-4">
                             <h1 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-wallet"></i> ระบบเก็บเงินกู้</h1>
-                            <button onClick={() => setShowAddModal(true)} class="bg-white text-blue-600 px-4 py-2 rounded-xl text-xs font-bold shadow-sm hover:bg-slate-50 transition"><i class="fa-solid fa-user-plus mr-1"></i> เพิ่มลูกหนี้</button>
+                            <button onClick={() => setShowAddModal(true)} class="bg-white text-blue-600 px-4 py-2 rounded-xl text-xs font-bold shadow-sm hover:bg-slate-50 transition active:scale-95"><i class="fa-solid fa-user-plus mr-1"></i> เพิ่มลูกหนี้</button>
                         </div>
                         <div class="relative">
                             <input type="text" placeholder="ค้นหาชื่อลูกหนี้..." value={search} onChange={(e) => setSearch(e.target.value)} class="w-full bg-white/10 text-white placeholder-white/50 pl-10 pr-4 py-2.5 rounded-xl text-sm focus:outline-none focus:bg-white focus:text-slate-800" />
@@ -115,32 +164,50 @@
                         </div>
                     </div>
 
+                    {/* Tabs */}
                     <div class="flex border-b border-slate-100 bg-slate-50 sticky top-[116px] z-10">
-                        <button onClick={() => setActiveTab("today")} class={`flex-1 py-3 text-sm font-bold border-b-2 text-center ${activeTab === "today" ? "border-blue-600 text-blue-600 bg-white" : "border-transparent text-slate-500"}`}>ต้องเก็บ ({customers.filter(c => c.statusToday === "ต้องเก็บวันนี้").length})</button>
-                        <button onClick={() => setActiveTab("paid")} class={`flex-1 py-3 text-sm font-bold border-b-2 text-center ${activeTab === "paid" ? "border-blue-600 text-blue-600 bg-white" : "border-transparent text-slate-500"}`}>จ่ายแล้ว ({customers.filter(c => c.statusToday === "จ่ายแล้ว").length})</button>
-                        <button onClick={() => setActiveTab("all")} class={`flex-1 py-3 text-sm font-bold border-b-2 text-center ${activeTab === "all" ? "border-blue-600 text-blue-600 bg-white" : "border-transparent text-slate-500"}`}>ทั้งหมด ({customers.length})</button>
+                        <button onClick={() => setActiveTab("today")} class={`flex-1 py-3 text-sm font-bold border-b-2 text-center transition ${activeTab === "today" ? "border-blue-600 text-blue-600 bg-white" : "border-transparent text-slate-500"}`}>ต้องเก็บ ({customers.filter(c => c.statusToday === "ต้องเก็บวันนี้").length})</button>
+                        <button onClick={() => setActiveTab("paid")} class={`flex-1 py-3 text-sm font-bold border-b-2 text-center transition ${activeTab === "paid" ? "border-blue-600 text-blue-600 bg-white" : "border-transparent text-slate-500"}`}>จ่ายแล้ว ({customers.filter(c => c.statusToday === "จ่ายแล้ว").length})</button>
+                        <button onClick={() => setActiveTab("all")} class={`flex-1 py-3 text-sm font-bold border-b-2 text-center transition ${activeTab === "all" ? "border-blue-600 text-blue-600 bg-white" : "border-transparent text-slate-500"}`}>ทั้งหมด ({customers.length})</button>
                     </div>
 
+                    {/* Customer List */}
                     <div class="flex-1 p-4 overflow-y-auto">
                         {loading ? (
-                            <div class="flex flex-col items-center justify-center py-16 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-600 mb-3"></i><p class="text-sm">กำลังโหลดข้อมูล...</p></div>
+                            <div class="flex flex-col items-center justify-center py-16 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-600 mb-3"></i><p class="text-sm">กำลังโหลดข้อมูลเรียลไทม์...</p></div>
                         ) : error ? (
                             <div class="text-center py-12 text-red-500 font-medium">{error}</div>
                         ) : filteredCustomers.length === 0 ? (
-                            <div class="text-center py-12 text-slate-400 text-sm">ไม่พบรายชื่อลูกหนี้</div>
+                            <div class="text-center py-12 text-slate-400 text-sm">ไม่พบรายชื่อลูกหนี้ในหมวดนี้</div>
                         ) : (
                             <div class="space-y-3">
                                 {filteredCustomers.map(c => (
-                                    <div key={c.id} class="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm flex justify-between items-center">
-                                        <div>
-                                            <h3 class="font-bold text-slate-800 text-base mb-1">{c.name}</h3>
-                                            <p class="text-xs text-slate-500">เงินต้น: {c.principal} | ต้องส่ง: <strong class="text-indigo-600">{c.cyclePayment}</strong></p>
+                                    <div key={c.id} class="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm flex justify-between items-center transition hover:border-slate-200">
+                                        <div class="flex-1 min-w-0 pr-2">
+                                            <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+                                                <h3 class="font-bold text-slate-800 text-base truncate">{c.name}</h3>
+                                                {/* ป้ายเตือนเวลา + ยอดปรับสะสมประจำบุคคล */}
+                                                {renderStatusBadge(c)} 
+                                                
+                                                <button onClick={() => handleDeleteCustomer(c.id, c.name)} class="text-slate-300 hover:text-red-500 transition p-1 text-xs ml-auto" title="ลบลูกหนี้">
+                                                    <i class="fa-regular fa-trash-can"></i>
+                                                </button>
+                                            </div>
+                                            <p class="text-xs text-slate-500">
+                                                <span>เงินต้น: <strong class="text-slate-700">{c.principal}</strong></span>
+                                                <span class="mx-1.5">|</span>
+                                                <span>ต้องส่ง: <strong class="text-indigo-600">{c.cyclePayment}</strong></span>
+                                                <span class="mx-1.5">|</span>
+                                                <span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                                                    {c.loanType === 'daily' ? 'รายวัน' : c.loanType === 'weekly' ? 'รายสัปดาห์' : c.loanType === 'monthly' ? 'รายเดือน' : 'กำหนดเอง'}
+                                                </span>
+                                            </p>
                                         </div>
-                                        <div>
+                                        <div class="flex-shrink-0">
                                             {c.statusToday === "ต้องเก็บวันนี้" ? (
-                                                <button onClick={() => { setSelectedCustomer(c); setPayAmount(c.cyclePayment); setShowPayModal(true); }} class="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm">เก็บเงิน</button>
+                                                <button onClick={() => { setSelectedCustomer(c); setPayAmount(c.cyclePayment + (c.accumulatedFine || 0)); setShowPayModal(true); }} class="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-emerald-600 transition active:scale-95">เก็บเงิน</button>
                                             ) : (
-                                                <span class="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-xl text-xs font-bold"><i class="fa-solid fa-circle-check"></i> จ่ายแล้ว</span>
+                                                <span class="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1"><i class="fa-solid fa-circle-check"></i> จ่ายแล้ว</span>
                                             )}
                                         </div>
                                     </div>
@@ -149,47 +216,81 @@
                         )}
                     </div>
 
+                    {/* Modal: บันทึกการเก็บเงิน */}
                     {showPayModal && selectedCustomer && (
                         <div class="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
                             <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl">
-                                <h3 class="text-lg font-bold text-slate-800 mb-4">บันทึกการเก็บเงิน</h3>
+                                <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center"><i class="fa-solid fa-money-bill-wave text-emerald-500 mr-2"></i> บันทึกการเก็บเงิน</h3>
+                                <p class="text-sm text-slate-600 mb-2">ลูกหนี้: <strong class="text-slate-800">{selectedCustomer.name}</strong></p>
+                                <p class="text-xs text-slate-500 mb-4">ยอดปกติ: {selectedCustomer.cyclePayment} บ. {selectedCustomer.accumulatedFine > 0 && `+ ค่าปรับล่าช้า: ${selectedCustomer.accumulatedFine} บ.`}</p>
                                 <form onSubmit={handlePayment}>
                                     <div class="mb-5">
-                                        <input type="number" required value={payAmount} onChange={(e) => setPayAmount(e.target.value)} class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-slate-800 focus:outline-none" />
+                                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">จำนวนเงินที่เก็บได้จริง (บาท)</label>
+                                        <input type="number" required value={payAmount} onChange={(e) => setPayAmount(e.target.value)} class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition" />
                                     </div>
                                     <div class="flex gap-3">
-                                        <button type="button" onClick={() => setShowPayModal(false)} class="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl text-sm font-bold">ยกเลิก</button>
-                                        <button type="submit" class="flex-1 bg-emerald-500 text-white py-3 rounded-xl text-sm font-bold">บันทึก</button>
+                                        <button type="button" onClick={() => setShowPayModal(false)} class="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl text-sm font-bold hover:bg-slate-200 transition">ยกเลิก</button>
+                                        <button type="submit" class="flex-1 bg-emerald-500 text-white py-3 rounded-xl text-sm font-bold shadow-md hover:bg-emerald-600 transition">บันทึกชำระ</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
                     )}
 
+                    {/* Modal: เพิ่มข้อมูลลูกหนี้ใหม่ (เพิ่มฟิลด์กำหนดค่าปรับเอง) */}
                     {showAddModal && (
                         <div class="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
                             <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
-                                <h3 class="text-lg font-bold text-slate-800 mb-4">เพิ่มข้อมูลลูกหนี้ใหม่</h3>
+                                <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center"><i class="fa-solid fa-user-plus text-blue-500 mr-2"></i> เพิ่มข้อมูลลูกหนี้ใหม่</h3>
                                 <form onSubmit={handleAddCustomer} class="space-y-4">
                                     <div>
-                                        <label class="block text-xs font-bold text-slate-500 mb-1">ชื่อ-นามสกุล</label>
-                                        <input type="text" required value={name} onChange={(e) => setName(e.target.value)} class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2" />
+                                        <label class="block text-xs font-bold text-slate-500 mb-1.5">ชื่อ-นามสกุล</label>
+                                        <input type="text" required value={name} onChange={(e) => setName(e.target.value)} placeholder="เช่น นายสมชาย ใจดี" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition" />
                                     </div>
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label class="block text-xs font-bold text-slate-500 mb-1.5">เงินต้นที่ปล่อยกู้ (บาท)</label>
+                                            <input type="number" required value={principal} onChange={(e) => setPrincipal(e.target.value)} placeholder="เช่น 10000" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition" />
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-bold text-slate-500 mb-1.5">ดอกเบี้ยทั้งหมด (%)</label>
+                                            <input type="number" step="any" value={interestRate} onChange={(e) => setInterestRate(e.target.value)} placeholder="ว่างไว้ = ดอกเบี้ยเดิม" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition" />
+                                        </div>
+                                    </div>
+                                    
+                                    {/* ✨ ฟิลด์ใหม่: กำหนดยอดค่าปรับชำระช้าด้วยตัวเอง */}
                                     <div>
-                                        <label class="block text-xs font-bold text-slate-500 mb-1">ประเภทการส่งเงินกู้</label>
-                                        <select value={loanType} onChange={(e) => setLoanType(e.target.value)} class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2">
-                                            <option value="daily">รายวัน</option>
-                                            <option value="weekly">รายสัปดาห์</option>
-                                            <option value="monthly">รายเดือน</option>
+                                        <label class="block text-xs font-bold text-rose-600 mb-1.5"><i class="fa-solid fa-hand-holding-dollar"></i> ค่าปรับชำระล่าช้า (บาท / วัน)</label>
+                                        <input type="number" value={penaltyPerDay} onChange={(e) => setPenaltyPerDay(e.target.value)} placeholder="เช่น 50 (ว่างไว้ = ไม่มีค่าปรับ)" class="w-full bg-rose-50/50 border border-rose-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-rose-500 focus:bg-white transition text-rose-700 font-medium" />
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 mb-1.5">ประเภทการส่งเงินกู้</label>
+                                        <select value={loanType} onChange={(e) => setLoanType(e.target.value)} class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition">
+                                            <option value="daily">รายวัน (ส่งทุกวัน)</option>
+                                            <option value="weekly">รายสัปดาห์ (ส่งสัปดาห์ละครั้ง)</option>
+                                            <option value="monthly">รายเดือน (ส่งเดือนละครั้ง)</option>
+                                            <option value="custom">กำหนดเอง (ระบุยอดส่งและวันเอง)</option>
                                         </select>
                                     </div>
-                                    <div>
-                                        <label class="block text-xs font-bold text-slate-500 mb-1">เงินต้น (บาท)</label>
-                                        <input type="number" required value={principal} onChange={(e) => setPrincipal(e.target.value)} class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2" />
-                                    </div>
+
+                                    {/* ตัวเลือกกำหนดเอง */}
+                                    {loanType === "custom" && (
+                                        <div class="grid grid-cols-2 gap-3 bg-blue-50/70 p-3 rounded-2xl border border-blue-100 animate-fadeIn">
+                                            <div>
+                                                <label class="block text-xs font-bold text-blue-700 mb-1.5">ยอดส่งต่อรอบ (บาท)</label>
+                                                <input type="number" required={loanType === "custom"} placeholder="เช่น 500" value={customCyclePayment} onChange={(e) => setCustomCyclePayment(e.target.value)} class="w-full bg-white border border-blue-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 shadow-inner" />
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-bold text-blue-700 mb-1.5">จำนวนวันส่ง (วัน)</label>
+                                                <input type="number" required={loanType === "custom"} placeholder="เช่น 24" value={customDays} onChange={(e) => setCustomDays(e.target.value)} class="w-full bg-white border border-blue-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 shadow-inner" />
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div class="flex gap-3 pt-2">
-                                        <button type="button" onClick={() => setShowAddModal(false)} class="flex-1 bg-slate-100 text-slate-600 py-2.5 rounded-xl text-sm font-bold">ยกเลิก</button>
-                                        <button type="submit" class="flex-1 bg-blue-600 text-white py-2.5 rounded-xl text-sm font-bold">บันทึก</button>
+                                        <button type="button" onClick={() => setShowAddModal(false)} class="flex-1 bg-slate-100 text-slate-600 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-200 transition">ยกเลิก</button>
+                                        <button type="submit" class="flex-1 bg-blue-600 text-white py-2.5 rounded-xl text-sm font-bold shadow-md hover:bg-blue-700 transition">บันทึกข้อมูล</button>
                                     </div>
                                 </form>
                             </div>
