@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบติดตามการชำระเงินกู้ (Loan Tracker)</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-50 min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyTs4XtycDxfb-fAxSqFoNkvuob-DrMYHglZbXoUIFmInCr4fyXqiMdaIuPnMT-_Xgf/exec";
+
+        function App() {
+            const [customers, setCustomers] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
+            const [search, setSearch] = useState("");
+            const [activeTab, setActiveTab] = useState("today");
+            const [showAddModal, setShowAddModal] = useState(false);
+            const [showPayModal, setShowPayModal] = useState(false);
+            const [selectedCustomer, setSelectedCustomer] = useState(null);
+            const [name, setName] = useState("");
+            const [loanType, setLoanType] = useState("daily");
+            const [principal, setPrincipal] = useState("");
+            const [customCyclePayment, setCustomCyclePayment] = useState("");
+            const [customDays, setCustomDays] = useState("");
+            const [payAmount, setPayAmount] = useState("");
+
+            useEffect(() => { fetchData(); }, []);
+
+            const fetchData = async () => {
+                setLoading(true);
+                try {
+                    const res = await fetch(`${SCRIPT_URL}?action=getCustomers`);
+                    const data = await res.json();
+                    setCustomers(data);
+                    setError(null);
+                } catch (err) {
+                    setError("ไม่สามารถดึงข้อมูลได้ กรุณารีเฟรชหน้าจอ");
+                } finaly { setLoading(false); }
+            };
+
+            const handleAddCustomer = async (e) => {
+                e.preventDefault(); setLoading(true); setShowAddModal(false);
+                try {
+                    await fetch(SCRIPT_URL, {
+                        method: "POST",
+                        mode: "no-cors",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            action: "addCustomer", name, loanType,
+                            principal: parseFloat(principal),
+                            customCyclePayment: customCyclePayment ? parseFloat(customCyclePayment) : null,
+                            customDays: customDays ? parseInt(customDays) : null
+                        })
+                    });
+                    setName(""); setPrincipal(""); setCustomCyclePayment(""); setCustomDays("");
+                    setTimeout(fetchData, 1500);
+                } catch (err) { alert("เกิดข้อผิดพลาด"); setLoading(false); }
+            };
+
+            const handlePayment = async (e) => {
+                e.preventDefault(); setLoading(true); setShowPayModal(false);
+                try {
+                    await fetch(SCRIPT_URL, {
+                        method: "POST",
+                        mode: "no-cors",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ action: "recordPayment", id: selectedCustomer.id, amount: parseFloat(payAmount) })
+                    });
+                    setPayAmount(""); setTimeout(fetchData, 1500);
+                } catch (err) { alert("เกิดข้อผิดพลาด"); setLoading(false); }
+            };
+
+            const filteredCustomers = customers.filter(c => {
+                const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase());
+                if (!matchesSearch) return false;
+                if (activeTab === "today") return c.statusToday === "ต้องเก็บวันนี้";
+                if (activeTab === "paid") return c.statusToday === "จ่ายแล้ว";
+                return true; 
+            });
+
+            return (
+                <div class="max-w-md mx-auto min-h-screen flex flex-col bg-white shadow-xl border-x border-slate-100">
+                    <div class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-5 shadow-md sticky top-0 z-10 rounded-b-2xl">
+                        <div class="flex justify-between items-center mb-4">
+                            <h1 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-wallet"></i> ระบบเก็บเงินกู้</h1>
+                            <button onClick={() => setShowAddModal(true)} class="bg-white text-blue-600 px-4 py-2 rounded-xl text-xs font-bold shadow-sm hover:bg-slate-50 transition"><i class="fa-solid fa-user-plus mr-1"></i> เพิ่มลูกหนี้</button>
+                        </div>
+                        <div class="relative">
+                            <input type="text" placeholder="ค้นหาชื่อลูกหนี้..." value={search} onChange={(e) => setSearch(e.target.value)} class="w-full bg-white/10 text-white placeholder-white/50 pl-10 pr-4 py-2.5 rounded-xl text-sm focus:outline-none focus:bg-white focus:text-slate-800" />
+                            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3.5 text-white/50"></i>
+                        </div>
+                    </div>
+
+                    <div class="flex border-b border-slate-100 bg-slate-50 sticky top-[116px] z-10">
+                        <button onClick={() => setActiveTab("today")} class={`flex-1 py-3 text-sm font-bold border-b-2 text-center ${activeTab === "today" ? "border-blue-600 text-blue-600 bg-white" : "border-transparent text-slate-500"}`}>ต้องเก็บ ({customers.filter(c => c.statusToday === "ต้องเก็บวันนี้").length})</button>
+                        <button onClick={() => setActiveTab("paid")} class={`flex-1 py-3 text-sm font-bold border-b-2 text-center ${activeTab === "paid" ? "border-blue-600 text-blue-600 bg-white" : "border-transparent text-slate-500"}`}>จ่ายแล้ว ({customers.filter(c => c.statusToday === "จ่ายแล้ว").length})</button>
+                        <button onClick={() => setActiveTab("all")} class={`flex-1 py-3 text-sm font-bold border-b-2 text-center ${activeTab === "all" ? "border-blue-600 text-blue-600 bg-white" : "border-transparent text-slate-500"}`}>ทั้งหมด ({customers.length})</button>
+                    </div>
+
+                    <div class="flex-1 p-4 overflow-y-auto">
+                        {loading ? (
+                            <div class="flex flex-col items-center justify-center py-16 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-600 mb-3"></i><p class="text-sm">กำลังโหลดข้อมูล...</p></div>
+                        ) : error ? (
+                            <div class="text-center py-12 text-red-500 font-medium">{error}</div>
+                        ) : filteredCustomers.length === 0 ? (
+                            <div class="text-center py-12 text-slate-400 text-sm">ไม่พบรายชื่อลูกหนี้</div>
+                        ) : (
+                            <div class="space-y-3">
+                                {filteredCustomers.map(c => (
+                                    <div key={c.id} class="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm flex justify-between items-center">
+                                        <div>
+                                            <h3 class="font-bold text-slate-800 text-base mb-1">{c.name}</h3>
+                                            <p class="text-xs text-slate-500">เงินต้น: {c.principal} | ต้องส่ง: <strong class="text-indigo-600">{c.cyclePayment}</strong></p>
+                                        </div>
+                                        <div>
+                                            {c.statusToday === "ต้องเก็บวันนี้" ? (
+                                                <button onClick={() => { setSelectedCustomer(c); setPayAmount(c.cyclePayment); setShowPayModal(true); }} class="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm">เก็บเงิน</button>
+                                            ) : (
+                                                <span class="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-xl text-xs font-bold"><i class="fa-solid fa-circle-check"></i> จ่ายแล้ว</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {showPayModal && selectedCustomer && (
+                        <div class="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+                            <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl">
+                                <h3 class="text-lg font-bold text-slate-800 mb-4">บันทึกการเก็บเงิน</h3>
+                                <form onSubmit={handlePayment}>
+                                    <div class="mb-5">
+                                        <input type="number" required value={payAmount} onChange={(e) => setPayAmount(e.target.value)} class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-slate-800 focus:outline-none" />
+                                    </div>
+                                    <div class="flex gap-3">
+                                        <button type="button" onClick={() => setShowPayModal(false)} class="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl text-sm font-bold">ยกเลิก</button>
+                                        <button type="submit" class="flex-1 bg-emerald-500 text-white py-3 rounded-xl text-sm font-bold">บันทึก</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {showAddModal && (
+                        <div class="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+                            <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
+                                <h3 class="text-lg font-bold text-slate-800 mb-4">เพิ่มข้อมูลลูกหนี้ใหม่</h3>
+                                <form onSubmit={handleAddCustomer} class="space-y-4">
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 mb-1">ชื่อ-นามสกุล</label>
+                                        <input type="text" required value={name} onChange={(e) => setName(e.target.value)} class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 mb-1">ประเภทการส่งเงินกู้</label>
+                                        <select value={loanType} onChange={(e) => setLoanType(e.target.value)} class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2">
+                                            <option value="daily">รายวัน</option>
+                                            <option value="weekly">รายสัปดาห์</option>
+                                            <option value="monthly">รายเดือน</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 mb-1">เงินต้น (บาท)</label>
+                                        <input type="number" required value={principal} onChange={(e) => setPrincipal(e.target.value)} class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2" />
+                                    </div>
+                                    <div class="flex gap-3 pt-2">
+                                        <button type="button" onClick={() => setShowAddModal(false)} class="flex-1 bg-slate-100 text-slate-600 py-2.5 rounded-xl text-sm font-bold">ยกเลิก</button>
+                                        <button type="submit" class="flex-1 bg-blue-600 text-white py-2.5 rounded-xl text-sm font-bold">บันทึก</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
