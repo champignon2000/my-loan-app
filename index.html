@@ -16,7 +16,7 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
         // ⚠️ สลับตรงนี้เป็นลิงก์ Web App ล่าสุดของคุณจาก Google Apps Script นะครับ
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbykJ6ksO-ZLGGponrtQCOAotw2LkLkIXA76KqDm-WHIcCTmkcplETHJp6R8rUCRGYoK/exec";
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz0gpyWec6WkCsqxn2w037Y6qM83iJIlBfN0ziabE8gCSiHGegXdE84X_LrDxXhmBIm/exec";
 
         function App() {
             const [customers, setCustomers] = useState([]);
@@ -28,20 +28,18 @@
             const [showPayModal, setShowPayModal] = useState(false);
             const [selectedCustomer, setSelectedCustomer] = useState(null);
             
-            // State ฟอร์มเพิ่มลูกหนี้
+            // State ฟอร์มเพิ่มลูกหนี้ (ปรับปรุงใหม่ตามโจทย์)
             const [name, setName] = useState("");
             const [loanType, setLoanType] = useState("daily");
             const [principal, setPrincipal] = useState("");
-            const [interestRate, setInterestRate] = useState(""); // เก็บค่าเป็น "บาท"
-            const [penaltyPerDay, setPenaltyPerDay] = useState(""); 
+            const [interestRate, setInterestRate] = useState(""); 
             const [loanDate, setLoanDate] = useState(new Date().toISOString().split('T')[0]);
-            const [dueDate, setDueDate] = useState(""); // วันปิดยอด
-            const [customCyclePayment, setCustomCyclePayment] = useState(""); 
-            const [customDays, setCustomDays] = useState(""); 
+            const [dueDate, setDueDate] = useState(""); // วันปิดยอด (กรอกหรือไม่ก็ได้)
+            const [customDays, setCustomDays] = useState(""); // กำหนดวันส่งเองว่าทุกกี่วัน
             
             // State สำหรับหน้าบันทึกจ่ายเงิน
             const [payAmount, setPayAmount] = useState("");
-            const [penaltyPaid, setPenaltyPaid] = useState("0"); // ย้ายช่องกรอกค่าปรับมาหน้านี้
+            const [penaltyPaid, setPenaltyPaid] = useState("0");
 
             useEffect(() => { 
                 fetchData(); 
@@ -61,30 +59,44 @@
                 }
             };
 
-            // ฟังก์ชันคำนวณสดหน้าเพิ่มลูกหนี้
+            // ฟังก์ชันคำนวณสด: ยอดตัดดอก + สรุปร้อยละ % + ปัดเศษครั้งเมื่อมีเศษวัน
             const calculatePreview = () => {
                 const p = parseFloat(principal) || 0;
                 const i = parseFloat(interestRate) || 0;
                 const total = p + i;
                 
-                // 1. คำนวณร้อยละกี่ %
+                // 1. คำนวณร้อยละ %
                 const percent = p > 0 ? ((i / p) * 100).toFixed(1) : "0.0";
                 
-                // 2. คำนวณยอดต้องส่งต่อรอบพรีวิว
+                // 2. คำนวณจำนวนครั้งที่จะตัดดอก (หากเหลือเศษวันให้ปัดเป็น 1 ครั้ง)
+                let times = 0;
                 let cyclePreview = 0;
-                if (loanType === "daily") cyclePreview = total / 24;
-                else if (loanType === "weekly") cyclePreview = total / 4;
-                else if (loanType === "monthly") cyclePreview = total;
-                else cyclePreview = parseFloat(customCyclePayment) || 0;
+
+                if (loanType === "daily") {
+                    times = 24;
+                    cyclePreview = total / 24;
+                } else if (loanType === "weekly") {
+                    times = 4;
+                    cyclePreview = total / 4;
+                } else if (loanType === "monthly") {
+                    times = 1;
+                    cyclePreview = total;
+                } else if (loanType === "custom") {
+                    const daysInput = parseFloat(customDays) || 0;
+                    // ปัดเศษขึ้นทันทีเมื่อมีเศษทศนิยมหรือเศษวัน
+                    times = Math.ceil(daysInput); 
+                    cyclePreview = times > 0 ? total / times : 0;
+                }
 
                 return {
                     percent,
+                    times,
                     cyclePreview: Math.round(cyclePreview * 100) / 100,
                     total
                 };
             };
 
-            const { percent, cyclePreview, total } = calculatePreview();
+            const { percent, times, cyclePreview, total } = calculatePreview();
 
             const handleAddCustomer = async (e) => {
                 e.preventDefault(); 
@@ -100,15 +112,13 @@
                             name, 
                             loanType,
                             principal: parseFloat(principal),
-                            interestRate: interestRate ? parseFloat(interestRate) : 0, // ส่งยอดบาทไปหลังบ้าน
-                            penaltyPerDay: penaltyPerDay ? parseFloat(penaltyPerDay) : 0, 
+                            interestRate: interestRate ? parseFloat(interestRate) : 0, 
                             loanDate, 
-                            dueDate, // ส่งวันปิดยอด
-                            customCyclePayment: loanType === "custom" ? parseFloat(customCyclePayment) : null, 
+                            dueDate: dueDate || "", // ส่งค่าว่างไปได้หากไม่ได้กรอก
                             customDays: loanType === "custom" ? parseInt(customDays) : null 
                         })
                     });
-                    setName(""); setPrincipal(""); setLoanType("daily"); setInterestRate(""); setPenaltyPerDay(""); setCustomCyclePayment(""); setCustomDays(""); setDueDate("");
+                    setName(""); setPrincipal(""); setLoanType("daily"); setInterestRate(""); setCustomDays(""); setDueDate("");
                     setLoanDate(new Date().toISOString().split('T')[0]);
                     setTimeout(fetchData, 1500);
                 } catch (err) { 
@@ -121,8 +131,6 @@
                 e.preventDefault(); 
                 setLoading(true); 
                 setShowPayModal(false);
-                
-                // ยอดเก็บจริง = ยอดชำระเงินต้น/ดอกเบี้ยปกติ + ยอดค่าปรับที่เก็บได้ในวันนั้น
                 const finalAmount = (parseFloat(payAmount) || 0) + (parseFloat(penaltyPaid) || 0);
 
                 try {
@@ -201,7 +209,7 @@
                     {/* Customer List */}
                     <div class="flex-1 p-4 overflow-y-auto">
                         {loading ? (
-                            <div class="flex flex-col items-center justify-center py-16 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-600 mb-3"></i><p class="text-sm">กำลังโหลดข้อมูลระบบคำนวณใหม่...</p></div>
+                            <div class="flex flex-col items-center justify-center py-16 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-600 mb-3"></i><p class="text-sm">กำลังโหลดข้อมูลระบบปรับปรุงใหม่...</p></div>
                         ) : error ? (
                             <div class="text-center py-12 text-red-500 font-medium">{error}</div>
                         ) : filteredCustomers.length === 0 ? (
@@ -218,7 +226,7 @@
                                                 </div>
                                                 <div class="text-[11px] text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                                                     <span>เริ่มกู้: <strong>{c.loanDate || "-"}</strong></span>
-                                                    <span class="text-rose-500 font-bold">| ปิดยอด: {c.dueDate || "ไม่ระบุ"}</span>
+                                                    <span class="text-rose-500 font-bold">| ปิดยอด: {c.dueDate || "-"}</span>
                                                     <span>|</span>
                                                     <span class="text-emerald-600 font-medium">ส่งแล้ว: {c.totalPaid} บ.</span>
                                                     <span>|</span>
@@ -237,7 +245,7 @@
                                                 <span>ดอก: <strong class="text-amber-600">{c.interestRate} บ.</strong></span>
                                                 <span class="mx-1">|</span>
                                                 <span>ต้องส่ง/ครั้ง: <strong class="text-indigo-600">{c.cyclePayment}</strong></span>
-                                                <span class="ml-1 bg-slate-100 text-slate-600 px-1 rounded text-[9px]">
+                                                <span class="ml-1 bg-slate-100 text-slate-600 px-1 rounded text-[9px] uppercase">
                                                     {c.loanType === 'daily' ? 'รายวัน' : c.loanType === 'weekly' ? 'รายสัปดาห์' : c.loanType === 'monthly' ? 'รายเดือน' : 'กำหนดเอง'}
                                                 </span>
                                             </p>
@@ -255,21 +263,20 @@
                         )}
                     </div>
 
-                    {/* Modal: บันทึกการเก็บเงิน (ย้ายหน้าต่างค่าปรับมาอยู่ที่นี่แล้ว) */}
+                    {/* Modal: บันทึกการเก็บเงิน */}
                     {showPayModal && selectedCustomer && (
                         <div class="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
                             <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl">
                                 <h3 class="text-lg font-bold text-slate-800 mb-3 flex items-center"><i class="fa-solid fa-money-bill-wave text-emerald-500 mr-2"></i> บันทึกการเก็บเงิน</h3>
                                 <p class="text-sm text-slate-600 mb-1">ลูกหนี้: <strong class="text-slate-800">{selectedCustomer.name}</strong></p>
-                                <p class="text-xs text-slate-500 mb-4">ยอดค้างรวมในตาราง: {selectedCustomer.remainingBalance} บ. (ตั้งปรับไว้ วันละ {selectedCustomer.penaltyPerDay} บ.)</p>
+                                <p class="text-xs text-slate-500 mb-4">ยอดค้างรวมในตาราง: {selectedCustomer.remainingBalance} บ.</p>
                                 <form onSubmit={handlePayment} class="space-y-4">
                                     <div>
                                         <label class="block text-xs font-bold text-slate-500 mb-1">1. ยอดเก็บส่งปกติประจำรอบ (บาท)</label>
                                         <input type="number" required value={payAmount} onChange={(e) => setPayAmount(e.target.value)} class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-base font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition" />
                                     </div>
-                                    {/* ✨ ย้ายช่องค่าปรับมาใส่ตรงนี้ */}
                                     <div>
-                                        <label class="block text-xs font-bold text-rose-600 mb-1">2. ยอดเงินค่าปรับที่เก็บได้เพิ่มในรอบนี้ (บาท)</label>
+                                        <label class="block text-xs font-bold text-rose-600 mb-1">2. ยอดเงินค่าปรับล่าช้าที่เก็บได้เพิ่ม (บาท)</label>
                                         <input type="number" required value={penaltyPaid} onChange={(e) => setPenaltyPaid(e.target.value)} class="w-full bg-rose-50/50 border border-rose-200 rounded-xl px-4 py-2.5 text-base font-bold text-rose-700 focus:outline-none focus:border-rose-500 focus:bg-white transition" />
                                     </div>
                                     <div class="bg-slate-50 p-2.5 rounded-xl text-xs text-slate-600 text-center font-medium">
@@ -284,7 +291,7 @@
                         </div>
                     )}
 
-                    {/* Modal: เพิ่มข้อมูลลูกหนี้ใหม่ (พร้อมระบบคำนวณสดและร้อยละ %) */}
+                    {/* Modal: เพิ่มข้อมูลลูกหนี้ใหม่ (ถอดช่องค่าปรับออก + ปรับเมนูกำหนดจำนวนวันส่งเอง) */}
                     {showAddModal && (
                         <div class="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
                             <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -305,47 +312,43 @@
                                         </div>
                                     </div>
                                     
-                                    <div class="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label class="block text-xs font-bold text-rose-600 mb-1">ค่าปรับล่าช้า (บ./วัน)</label>
-                                            <input type="number" value={penaltyPerDay} onChange={(e) => setPenaltyPerDay(e.target.value)} placeholder="0" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition" />
-                                        </div>
-                                        <div>
-                                            <label class="block text-xs font-bold text-slate-500 mb-1">ประเภทการส่ง</label>
-                                            <select value={loanType} onChange={(e) => setLoanType(e.target.value)} class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition">
-                                                <option value="daily">รายวัน (24 วัน)</option>
-                                                <option value="weekly">รายสัปดาห์ (4 ครั้ง)</option>
-                                                <option value="monthly">รายเดือน (1 ครั้ง)</option>
-                                                <option value="custom">กำหนดเอง</option>
-                                            </select>
-                                        </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 mb-1">ประเภทการส่งเงินกู้</label>
+                                        <select value={loanType} onChange={(e) => setLoanType(e.target.value)} class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition">
+                                            <option value="daily">รายวัน (ส่งทุกวัน - ตัดดอก 24 ครั้ง)</option>
+                                            <option value="weekly">รายสัปดาห์ (ส่งรายสัปดาห์ - ตัดดอก 4 ครั้ง)</option>
+                                            <option value="monthly">รายเดือน (ส่งรายเดือน - ตัดดอก 1 ครั้ง)</option>
+                                            <option value="custom">กำหนดเอง (ระบุจำนวนวันที่ต้องส่งเอง)</option>
+                                        </select>
                                     </div>
+
+                                    {/* ✨ เมนูระบุวันส่งเองกรณีเลือกกำหนดเอง */}
+                                    {loanType === "custom" && (
+                                        <div class="p-3 bg-blue-50 rounded-xl border border-blue-100">
+                                            <label class="block text-xs font-bold text-blue-700 mb-1">ส่งทั้งหมดกี่วัน (กรอกจำนวนวันรวมสัญญากู้)</label>
+                                            <input type="number" step="any" required={loanType === "custom"} placeholder="เช่น 10 วัน หรือ 15.5 วัน" value={customDays} onChange={(e) => setCustomDays(e.target.value)} class="w-full bg-white border border-blue-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+                                        </div>
+                                    )}
 
                                     <div class="grid grid-cols-2 gap-3">
                                         <div>
                                             <label class="block text-xs font-bold text-slate-500 mb-1">วันที่เริ่มกู้ยืม</label>
                                             <input type="date" required value={loanDate} onChange={(e) => setLoanDate(e.target.value)} class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500 focus:bg-white transition" />
                                         </div>
-                                        {/* ✨ ฟิลด์เพิ่มใหม่: วันปิดยอด */}
+                                        {/* ✨ ไม่บังคับใส่กรอกวันปิดยอดแล้ว (กรอกหรือไม่ก็ได้) */}
                                         <div>
-                                            <label class="block text-xs font-bold text-rose-600 mb-1">วันที่ต้องปิดยอด</label>
-                                            <input type="date" required value={dueDate} onChange={(e) => setDueDate(e.target.value)} class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500 focus:bg-white transition" />
+                                            <label class="block text-xs font-bold text-rose-600 mb-1">วันที่ต้องปิดยอด (ระบุหรือไม่ก็ได้)</label>
+                                            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500 focus:bg-white transition" />
                                         </div>
                                     </div>
 
-                                    {loanType === "custom" && (
-                                        <div class="p-3 bg-blue-50 rounded-xl border border-blue-100">
-                                            <label class="block text-xs font-bold text-blue-700 mb-1">ยอดส่งต่อรอบกำหนดเอง (บาท)</label>
-                                            <input type="number" required={loanType === "custom"} placeholder="เช่น 500" value={customCyclePayment} onChange={(e) => setCustomCyclePayment(e.target.value)} class="w-full bg-white border border-blue-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
-                                        </div>
-                                    )}
-
-                                    {/* ✨ หน้าจอคำนวณยอดพรีวิวและร้อยละ % สด ๆ ทันทีขณะพิมพ์ */}
+                                    {/* ✨ กล่องพรีวิวคำนวณ: แจ้งจำนวนครั้งตัดดอก + ปัดเศษเมื่อเหลือเศษวันครบถ้วน */}
                                     <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-3 space-y-1 text-xs text-indigo-950">
                                         <p class="font-bold text-center text-indigo-600 border-b border-indigo-200/60 pb-1 mb-1">📊 หน้าต่างคำนวณยอดอัตโนมัติ</p>
                                         <div class="flex justify-between"><span>ยอดหนี้รวมทั้งหมด (ต้น+ดอก):</span><strong>{total} บาท</strong></div>
                                         <div class="flex justify-between text-amber-700"><span>คิดเป็นดอกเบี้ยร้อยละ:</span><strong>{percent} % ของเงินต้น</strong></div>
-                                        <div class="flex justify-between text-emerald-700 font-bold text-sm pt-0.5"><span>ต้องส่งต่อครั้งโดยประมาณ:</span><span>{cyclePreview} บาท</span></div>
+                                        <div class="flex justify-between text-blue-700"><span>ต้องตัดดอกทั้งหมด:</span><strong class="bg-blue-100 px-1.5 rounded">{times} ครั้ง</strong></div>
+                                        <div class="flex justify-between text-emerald-700 font-bold text-sm pt-0.5"><span>ต้องส่งต่อครั้ง:</span><span>{cyclePreview} บาท</span></div>
                                     </div>
 
                                     <div class="flex gap-3 pt-1">
