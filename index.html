@@ -28,12 +28,13 @@
             const [showPayModal, setShowPayModal] = useState(false);
             const [selectedCustomer, setSelectedCustomer] = useState(null);
             
-            // State สำหรับฟอร์มเพิ่มลูกหนี้
+            // State ฟอร์มเพิ่มลูกหนี้
             const [name, setName] = useState("");
             const [loanType, setLoanType] = useState("daily");
             const [principal, setPrincipal] = useState("");
             const [interestRate, setInterestRate] = useState(""); 
-            const [penaltyPerDay, setPenaltyPerDay] = useState(""); // ✨ ฟิลด์กำหนดค่าปรับเอง
+            const [penaltyPerDay, setPenaltyPerDay] = useState(""); 
+            const [loanDate, setLoanDate] = useState(new Date().toISOString().split('T')[0]);
             const [customCyclePayment, setCustomCyclePayment] = useState(""); 
             const [customDays, setCustomDays] = useState(""); 
             const [payAmount, setPayAmount] = useState("");
@@ -71,12 +72,14 @@
                             loanType,
                             principal: parseFloat(principal),
                             interestRate: interestRate ? parseFloat(interestRate) : null,
-                            penaltyPerDay: penaltyPerDay ? parseFloat(penaltyPerDay) : 0, // ✨ ส่งยอดค่าปรับไปหลังบ้าน
+                            penaltyPerDay: penaltyPerDay ? parseFloat(penaltyPerDay) : 0, 
+                            loanDate, 
                             customCyclePayment: loanType === "custom" ? parseFloat(customCyclePayment) : null, 
                             customDays: loanType === "custom" ? parseInt(customDays) : null 
                         })
                     });
                     setName(""); setPrincipal(""); setLoanType("daily"); setInterestRate(""); setPenaltyPerDay(""); setCustomCyclePayment(""); setCustomDays("");
+                    setLoanDate(new Date().toISOString().split('T')[0]);
                     setTimeout(fetchData, 1500);
                 } catch (err) { 
                     alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล"); 
@@ -104,7 +107,7 @@
             };
 
             const handleDeleteCustomer = async (id, customerName) => {
-                if (window.confirm(`คุณแน่ใจหรือไม่ที่จะลบรายชื่อคุณ "${customerName}" ออกจากระบบ? ข้อมูลจะหายไปจากตารางชีททั้งหมด`)) {
+                if (window.confirm(`คุณแน่ใจหรือไม่ที่จะลบรายชื่อคุณ "${customerName}" ออกจากระบบ? ข้อมูลจะหายไปทั้งหมด`)) {
                     setLoading(true);
                     try {
                         await fetch(SCRIPT_URL, {
@@ -121,24 +124,17 @@
                 }
             };
 
-            // แสดงสถานะเวลา และคำนวณป้ายค่าปรับสะสม
             const renderStatusBadge = (c) => {
-                const status = c.paymentStatusText || c.status || "";
-                
+                const status = c.paymentStatusText || "";
                 if (status.includes("ล่วงหน้า")) {
                     return <span class="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md text-[10px] font-bold border border-blue-100 flex items-center gap-1"><i class="fa-solid fa-angles-up"></i> จ่ายล่วงหน้า</span>;
                 } else if (status.includes("ล่าช้า") || status.includes("ค้าง") || status.includes("เกินกำหนด")) {
-                    // หากล่าช้าและมีการตั้งค่าปรับไว้ ให้แสดงยอดปรับสะสมโชว์ด้วย
                     const fineText = c.accumulatedFine > 0 ? ` (ปรับสะสม +${c.accumulatedFine} บ.)` : " (ค้างส่ง)";
-                    return (
-                        <div class="flex gap-1 flex-wrap">
-                            <span class="bg-rose-50 text-rose-600 px-2 py-0.5 rounded-md text-[10px] font-bold border border-rose-100 flex items-center gap-1"><i class="fa-solid fa-triangle-exclamation animate-pulse"></i> ล่าช้า{fineText}</span>
-                        </div>
-                    );
+                    return <span class="bg-rose-50 text-rose-600 px-2 py-0.5 rounded-md text-[10px] font-bold border border-rose-100 flex items-center gap-1"><i class="fa-solid fa-triangle-exclamation animate-pulse"></i> ล่าช้า{fineText}</span>;
                 } else if (status.includes("ตามเวลา") || status.includes("ปกติ") || status.includes("ต้องเก็บวันนี้")) {
                     return <span class="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-amber-100 flex items-center gap-1"><i class="fa-solid fa-clock"></i> ตามเวลา</span>;
                 } else {
-                    return <span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1">{status}</span>;
+                    return <span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md text-[10px] font-bold">{status}</span>;
                 }
             };
 
@@ -174,7 +170,7 @@
                     {/* Customer List */}
                     <div class="flex-1 p-4 overflow-y-auto">
                         {loading ? (
-                            <div class="flex flex-col items-center justify-center py-16 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-600 mb-3"></i><p class="text-sm">กำลังโหลดข้อมูลเรียลไทม์...</p></div>
+                            <div class="flex flex-col items-center justify-center py-16 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-600 mb-3"></i><p class="text-sm">กำลังโหลดข้อมูลโครงสร้างใหม่...</p></div>
                         ) : error ? (
                             <div class="text-center py-12 text-red-500 font-medium">{error}</div>
                         ) : filteredCustomers.length === 0 ? (
@@ -182,17 +178,25 @@
                         ) : (
                             <div class="space-y-3">
                                 {filteredCustomers.map(c => (
-                                    <div key={c.id} class="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm flex justify-between items-center transition hover:border-slate-200">
-                                        <div class="flex-1 min-w-0 pr-2">
-                                            <div class="flex items-center gap-2 mb-1.5 flex-wrap">
-                                                <h3 class="font-bold text-slate-800 text-base truncate">{c.name}</h3>
-                                                {/* ป้ายเตือนเวลา + ยอดปรับสะสมประจำบุคคล */}
-                                                {renderStatusBadge(c)} 
-                                                
-                                                <button onClick={() => handleDeleteCustomer(c.id, c.name)} class="text-slate-300 hover:text-red-500 transition p-1 text-xs ml-auto" title="ลบลูกหนี้">
-                                                    <i class="fa-regular fa-trash-can"></i>
-                                                </button>
+                                    <div key={c.id} class="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm flex flex-col gap-2 transition hover:border-slate-200">
+                                        <div class="flex justify-between items-start">
+                                            <div class="flex-1 min-w-0">
+                                                <div class="flex items-center gap-2 mb-1 flex-wrap">
+                                                    <h3 class="font-bold text-slate-800 text-base truncate">{c.name}</h3>
+                                                    {renderStatusBadge(c)}
+                                                </div>
+                                                <div class="text-[11px] text-slate-400 flex items-center gap-1.5">
+                                                    <span><i class="fa-regular fa-calendar-check"></i> วันกู้: <strong>{c.loanDate || "-"}</strong></span>
+                                                    <span>|</span>
+                                                    <span class="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-bold"><i class="fa-solid fa-hand-holding-dollar"></i> ส่งแล้ว: {c.totalPaid} บ.</span>
+                                                </div>
                                             </div>
+                                            <button onClick={() => handleDeleteCustomer(c.id, c.name)} class="text-slate-300 hover:text-red-500 transition p-1 text-xs" title="ลบลูกหนี้">
+                                                <i class="fa-regular fa-trash-can"></i>
+                                            </button>
+                                        </div>
+                                        
+                                        <div class="flex justify-between items-center border-t border-dashed border-slate-100 pt-2">
                                             <p class="text-xs text-slate-500">
                                                 <span>เงินต้น: <strong class="text-slate-700">{c.principal}</strong></span>
                                                 <span class="mx-1.5">|</span>
@@ -202,13 +206,13 @@
                                                     {c.loanType === 'daily' ? 'รายวัน' : c.loanType === 'weekly' ? 'รายสัปดาห์' : c.loanType === 'monthly' ? 'รายเดือน' : 'กำหนดเอง'}
                                                 </span>
                                             </p>
-                                        </div>
-                                        <div class="flex-shrink-0">
-                                            {c.statusToday === "ต้องเก็บวันนี้" ? (
-                                                <button onClick={() => { setSelectedCustomer(c); setPayAmount(c.cyclePayment + (c.accumulatedFine || 0)); setShowPayModal(true); }} class="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-emerald-600 transition active:scale-95">เก็บเงิน</button>
-                                            ) : (
-                                                <span class="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1"><i class="fa-solid fa-circle-check"></i> จ่ายแล้ว</span>
-                                            )}
+                                            <div>
+                                                {c.statusToday === "ต้องเก็บวันนี้" ? (
+                                                    <button onClick={() => { setSelectedCustomer(c); setPayAmount(c.cyclePayment + (c.accumulatedFine || 0)); setShowPayModal(true); }} class="bg-emerald-500 text-white px-4 py-1.5 rounded-xl text-xs font-bold shadow-sm hover:bg-emerald-600 transition active:scale-95">เก็บเงิน</button>
+                                                ) : (
+                                                    <span class="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1"><i class="fa-solid fa-circle-check"></i> จ่ายแล้ว</span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -237,7 +241,7 @@
                         </div>
                     )}
 
-                    {/* Modal: เพิ่มข้อมูลลูกหนี้ใหม่ (เพิ่มฟิลด์กำหนดค่าปรับเอง) */}
+                    {/* Modal: เพิ่มข้อมูลลูกหนี้ใหม่ */}
                     {showAddModal && (
                         <div class="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
                             <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
@@ -258,10 +262,15 @@
                                         </div>
                                     </div>
                                     
-                                    {/* ✨ ฟิลด์ใหม่: กำหนดยอดค่าปรับชำระช้าด้วยตัวเอง */}
-                                    <div>
-                                        <label class="block text-xs font-bold text-rose-600 mb-1.5"><i class="fa-solid fa-hand-holding-dollar"></i> ค่าปรับชำระล่าช้า (บาท / วัน)</label>
-                                        <input type="number" value={penaltyPerDay} onChange={(e) => setPenaltyPerDay(e.target.value)} placeholder="เช่น 50 (ว่างไว้ = ไม่มีค่าปรับ)" class="w-full bg-rose-50/50 border border-rose-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-rose-500 focus:bg-white transition text-rose-700 font-medium" />
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label class="block text-xs font-bold text-rose-600 mb-1.5">ค่าปรับชำระล่าช้า (บ./วัน)</label>
+                                            <input type="number" value={penaltyPerDay} onChange={(e) => setPenaltyPerDay(e.target.value)} placeholder="ว่างไว้ = 0" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition" />
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-bold text-slate-500 mb-1.5">วันที่เริ่มกู้ยืม</label>
+                                            <input type="date" required value={loanDate} onChange={(e) => setLoanDate(e.target.value)} class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition" />
+                                        </div>
                                     </div>
 
                                     <div>
@@ -274,16 +283,15 @@
                                         </select>
                                     </div>
 
-                                    {/* ตัวเลือกกำหนดเอง */}
                                     {loanType === "custom" && (
-                                        <div class="grid grid-cols-2 gap-3 bg-blue-50/70 p-3 rounded-2xl border border-blue-100 animate-fadeIn">
+                                        <div class="grid grid-cols-2 gap-3 bg-blue-50/70 p-3 rounded-2xl border border-blue-100">
                                             <div>
                                                 <label class="block text-xs font-bold text-blue-700 mb-1.5">ยอดส่งต่อรอบ (บาท)</label>
-                                                <input type="number" required={loanType === "custom"} placeholder="เช่น 500" value={customCyclePayment} onChange={(e) => setCustomCyclePayment(e.target.value)} class="w-full bg-white border border-blue-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 shadow-inner" />
+                                                <input type="number" required={loanType === "custom"} placeholder="เช่น 500" value={customCyclePayment} onChange={(e) => setCustomCyclePayment(e.target.value)} class="w-full bg-white border border-blue-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
                                             </div>
                                             <div>
                                                 <label class="block text-xs font-bold text-blue-700 mb-1.5">จำนวนวันส่ง (วัน)</label>
-                                                <input type="number" required={loanType === "custom"} placeholder="เช่น 24" value={customDays} onChange={(e) => setCustomDays(e.target.value)} class="w-full bg-white border border-blue-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 shadow-inner" />
+                                                <input type="number" required={loanType === "custom"} placeholder="เช่น 24" value={customDays} onChange={(e) => setCustomDays(e.target.value)} class="w-full bg-white border border-blue-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
                                             </div>
                                         </div>
                                     )}
