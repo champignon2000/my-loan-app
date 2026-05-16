@@ -4,24 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ระบบติดตามการชำระเงินกู้</title>
-    <!-- React 18 & Babel CDN -->
+    
+    <!-- 1. ต้องโหลดพวกนี้ให้เสร็จก่อนที่ React จะทำงาน (แก้ไขจุดนี้แล้ว) -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Tailwind CSS v4 CDN -->
+    
+    <!-- Tailwind CSS v4 & Icons -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-slate-50 min-h-screen font-sans">
     <div id="root"></div>
 
+    <!-- 2. ใส่ type="text/babel" เพื่อให้ Babel แปลงโค้ด React -->
     <script type="text/babel">
         const { useState, useEffect } = React;
         
-        // ⚠️ ใส่ลิงก์ Web App ของ Google Apps Script ของคุณที่นี่
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzDx6z24lfrSNIfwfwGxpSuwVG8BwQipBifMp0kZB1esrTyMvnTBxRW12Yyyp2_Y7tH/exec
-            ";
+        // ⚠️ อย่าลืมเอาลิงก์ Web App (Macros) ของคุณมาใส่ตรงนี้แทนนะครับ
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzDx6z24lfrSNIfwfwGxpSuwVG8BwQipBifMp0kZB1esrTyMvnTBxRW12Yyyp2_Y7tH/exec";
 
         function App() {
             const [customers, setCustomers] = useState([]);
@@ -30,21 +31,18 @@
             const [search, setSearch] = useState("");
             const [activeTab, setActiveTab] = useState("today");
             
-            // ปิด-เปิด หน้าต่าง (Modal)
             const [showAddModal, setShowAddModal] = useState(false);
             const [showPayModal, setShowPayModal] = useState(false);
             const [selectedCustomer, setSelectedCustomer] = useState(null);
             
-            // ฟอร์มเพิ่มลูกหนี้
             const [name, setName] = useState("");
             const [loanType, setLoanType] = useState("everyday"); 
-            const [principal, setPrincipal] = useState("");      // เงินต้น
-            const [interestRate, setInterestRate] = useState(""); // ดอกเบี้ยรวม
-            const [totalLoanAmount, setTotalLoanAmount] = useState(""); // ยอดรวม (ต้น + ดอก)
+            const [principal, setPrincipal] = useState("");      
+            const [interestRate, setInterestRate] = useState(""); 
+            const [totalLoanAmount, setTotalLoanAmount] = useState(""); 
             const [loanDate, setLoanDate] = useState(new Date().toISOString().split('T')[0]);
             const [daysLimit, setDaysLimit] = useState(""); 
             
-            // ฟอร์มเก็บเงิน
             const [payAmount, setPayAmount] = useState("");
             const [penaltyPaid, setPenaltyPaid] = useState("0");
 
@@ -62,10 +60,8 @@
                 } finally { setLoading(false); }
             };
 
-            // --- ฟังก์ชันผูกสูตรคำนวณอัตโนมัติ (ยกเว้นต้น) ---
             const handlePrincipalChange = (val) => {
                 setPrincipal(val);
-                // เมื่อเปลี่ยนต้น ให้ล้างค่าดอกเบี้ยและยอดรวม เพื่อให้พิมพ์จับคู่ใหม่ป้องกันค่าเก่าค้าง
                 setInterestRate("");
                 setTotalLoanAmount("");
             };
@@ -74,7 +70,6 @@
                 setInterestRate(val);
                 const p = parseFloat(principal) || 0;
                 const i = parseFloat(val) || 0;
-                // พิมพ์ดอกเบี้ย -> เติมช่องยอดรวมให้เอง (ต้น + ดอก)
                 if (val === "") {
                     setTotalLoanAmount("");
                 } else {
@@ -86,7 +81,6 @@
                 setTotalLoanAmount(val);
                 const p = parseFloat(principal) || 0;
                 const t = parseFloat(val) || 0;
-                // พิมพ์ยอดรวม -> เติมช่องดอกเบี้ยให้เอง (ยอดรวม - ต้น)
                 if (val === "") {
                     setInterestRate("");
                 } else {
@@ -94,7 +88,6 @@
                 }
             };
 
-            // คำนวณจำนวนครั้งและงวดส่ง
             const finalTotal = parseFloat(totalLoanAmount) || 0;
             const inputNumber = parseFloat(daysLimit) || 0;
             let calculatedTimes = 0;
@@ -223,7 +216,6 @@
                                         <button onClick={() => handleDeleteCustomer(c.id, c.name)} className="text-slate-300 hover:text-rose-500 p-1 text-xs transition"><i className="fa-regular fa-trash-can"></i></button>
                                     </div>
                                     
-                                    {/* รายละเอียดหนี้เงินกู้ */}
                                     <div className="bg-slate-50 rounded-lg p-2 text-xs grid grid-cols-2 gap-x-2 gap-y-1 text-slate-600">
                                         <div>เงินต้น+ดอกเบี้ย: <strong className="text-slate-800">{parseFloat(c.principal) + parseFloat(c.interestRate || 0)} บ.</strong></div>
                                         <div>ต้องส่งครั้งละ: <strong className="text-blue-600">{c.cyclePayment} บ.</strong></div>
@@ -231,7 +223,6 @@
                                         <div>ยอดค้างเหลืออยู่: <strong className="text-rose-600">{c.remainingBalance || 0} บ.</strong></div>
                                     </div>
 
-                                    {/* ปุ่มกดเก็บเงิน */}
                                     <div className="flex justify-end pt-1">
                                         {c.statusToday === "ต้องเก็บวันนี้" ? (
                                             <button onClick={() => { setSelectedCustomer(c); setPayAmount(c.cyclePayment); setPenaltyPaid("0"); setShowPayModal(true); }} className="w-full bg-blue-600 text-white text-xs font-bold py-2 rounded-xl shadow-xs hover:bg-blue-700 active:scale-95 transition">คลิกเก็บเงินประจำวันนี้</button>
@@ -249,7 +240,7 @@
                         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
                             <div className="bg-white w-full max-w-sm rounded-xl p-5 shadow-xl">
                                 <h3 className="text-base font-bold text-slate-800 mb-3"><i className="fa-solid fa-calculator text-blue-600 mr-1"></i> บันทึกเก็บเงินประจำรอบ</h3>
-                                <div className="text-xs text-slate-600 mb-4 bg-slate-50 p-2 rounded-lg">ลูกหนี้: <strong className="text-slate-800">{selectedCustomer.name}</strong> (ยอดค้างรวม: {selectedCustomer.remainingBalance} บ.)</div>
+                                <div className="text-xs text-slate-600 mb-4 bg-slate-50 p-2 rounded-lg">...</div>
                                 <form onSubmit={handlePayment} className="space-y-3">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 mb-1">ยอดเงินงวดปกติ (บาท)</label>
@@ -280,7 +271,6 @@
                                         <input type="text" required value={name} onChange={(e) => setName(e.target.value)} placeholder="กรอกชื่อลูกหนี้" className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
                                     </div>
                                     
-                                    {/* ส่วนกรอกตัวเลขเงิน (มีระบบคำนวณอัตโนมัติ) */}
                                     <div className="space-y-2.5 bg-slate-50 p-3 rounded-xl border border-slate-100">
                                         <div>
                                             <label className="block text-xs font-bold text-slate-600 mb-1">1. เงินต้น (บาท)</label>
@@ -319,7 +309,6 @@
                                         <input type="date" required value={loanDate} onChange={(e) => setLoanDate(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500" />
                                     </div>
 
-                                    {/* กล่องสรุปหนี้สินและงวดที่จะถูกส่งเก็บเงินจริง */}
                                     <div className="bg-slate-800 text-slate-100 rounded-xl p-3 text-xs space-y-1">
                                         <div className="flex justify-between"><span>ยอดเงินรวมที่จะตั้งในระบบ:</span><span className="font-bold text-white">{finalTotal} บ.</span></div>
                                         <div className="flex justify-between"><span>จำนวนครั้งที่ต้องเก็บ:</span><span className="font-bold text-amber-400">{calculatedTimes} ครั้ง</span></div>
