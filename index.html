@@ -33,7 +33,9 @@
             const [customDays, setCustomDays] = useState("");
             const [payAmount, setPayAmount] = useState("");
 
-            useEffect(() => { fetchData(); }, []);
+            useEffect(() => { 
+                fetchData(); 
+            }, []);
 
             const fetchData = async () => {
                 setLoading(true);
@@ -44,11 +46,15 @@
                     setError(null);
                 } catch (err) {
                     setError("ไม่สามารถดึงข้อมูลได้ กรุณารีเฟรชหน้าจอ");
-                } finaly { setLoading(false); }
+                } finally { 
+                    setLoading(false); 
+                }
             };
 
             const handleAddCustomer = async (e) => {
-                e.preventDefault(); setLoading(true); setShowAddModal(false);
+                e.preventDefault(); 
+                setLoading(true); 
+                setShowAddModal(false);
                 try {
                     await fetch(SCRIPT_URL, {
                         method: "POST",
@@ -63,11 +69,16 @@
                     });
                     setName(""); setPrincipal(""); setCustomCyclePayment(""); setCustomDays("");
                     setTimeout(fetchData, 1500);
-                } catch (err) { alert("เกิดข้อผิดพลาด"); setLoading(false); }
+                } catch (err) { 
+                    alert("เกิดข้อผิดพลาด"); 
+                    setLoading(false); 
+                }
             };
 
             const handlePayment = async (e) => {
-                e.preventDefault(); setLoading(true); setShowPayModal(false);
+                e.preventDefault(); 
+                setLoading(true); 
+                setShowPayModal(false);
                 try {
                     await fetch(SCRIPT_URL, {
                         method: "POST",
@@ -75,8 +86,12 @@
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ action: "recordPayment", id: selectedCustomer.id, amount: parseFloat(payAmount) })
                     });
-                    setPayAmount(""); setTimeout(fetchData, 1500);
-                } catch (err) { alert("เกิดข้อผิดพลาด"); setLoading(false); }
+                    setPayAmount(""); 
+                    setTimeout(fetchData, 1500);
+                } catch (err) { 
+                    alert("เกิดข้อผิดพลาด"); 
+                    setLoading(false); 
+                }
             };
 
             const filteredCustomers = customers.filter(c => {
