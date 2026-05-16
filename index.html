@@ -16,7 +16,7 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
         // ⚠️ สลับตรงนี้เป็นลิงก์ Web App ล่าสุดของคุณจาก Google Apps Script นะครับ
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx9NARjOg5972eVz6Uirjk4J3IL9p-Y4Y0YLvDl4Ffagdb_TNsh3Zh0rMXX2WF4y8rN/exec";
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxevegvwQlmeQs56rzIXA8B5mecVPS_hSRz37UKddZnZ9rV_QeUDBwXYoKPzWJ9h-Pc/exec";
 
         function App() {
             const [customers, setCustomers] = useState([]);
@@ -129,8 +129,7 @@
                 if (status.includes("ล่วงหน้า")) {
                     return <span class="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md text-[10px] font-bold border border-blue-100 flex items-center gap-1"><i class="fa-solid fa-angles-up"></i> จ่ายล่วงหน้า</span>;
                 } else if (status.includes("ล่าช้า") || status.includes("ค้าง") || status.includes("เกินกำหนด")) {
-                    const fineText = c.accumulatedFine > 0 ? ` (ปรับสะสม +${c.accumulatedFine} บ.)` : " (ค้างส่ง)";
-                    return <span class="bg-rose-50 text-rose-600 px-2 py-0.5 rounded-md text-[10px] font-bold border border-rose-100 flex items-center gap-1"><i class="fa-solid fa-triangle-exclamation animate-pulse"></i> ล่าช้า{fineText}</span>;
+                    return <span class="bg-rose-50 text-rose-600 px-2 py-0.5 rounded-md text-[10px] font-bold border border-rose-100 flex items-center gap-1"><i class="fa-solid fa-triangle-exclamation animate-pulse"></i> ล่าช้า</span>;
                 } else if (status.includes("ตามเวลา") || status.includes("ปกติ") || status.includes("ต้องเก็บวันนี้")) {
                     return <span class="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-amber-100 flex items-center gap-1"><i class="fa-solid fa-clock"></i> ตามเวลา</span>;
                 } else {
@@ -170,7 +169,7 @@
                     {/* Customer List */}
                     <div class="flex-1 p-4 overflow-y-auto">
                         {loading ? (
-                            <div class="flex flex-col items-center justify-center py-16 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-600 mb-3"></i><p class="text-sm">กำลังโหลดข้อมูลโครงสร้างใหม่...</p></div>
+                            <div class="flex flex-col items-center justify-center py-16 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-600 mb-3"></i><p class="text-sm">กำลังโหลดข้อมูลและยอดค้างชำระ...</p></div>
                         ) : error ? (
                             <div class="text-center py-12 text-red-500 font-medium">{error}</div>
                         ) : filteredCustomers.length === 0 ? (
@@ -185,10 +184,13 @@
                                                     <h3 class="font-bold text-slate-800 text-base truncate">{c.name}</h3>
                                                     {renderStatusBadge(c)}
                                                 </div>
-                                                <div class="text-[11px] text-slate-400 flex items-center gap-1.5">
+                                                {/* ✨ แสดงยอดส่งแล้ว ควบคู่กับ ยอดค้างชำระปัจจุบัน */}
+                                                <div class="text-[11px] text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-1">
                                                     <span><i class="fa-regular fa-calendar-check"></i> วันกู้: <strong>{c.loanDate || "-"}</strong></span>
                                                     <span>|</span>
-                                                    <span class="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-bold"><i class="fa-solid fa-hand-holding-dollar"></i> ส่งแล้ว: {c.totalPaid} บ.</span>
+                                                    <span class="text-emerald-600 font-medium">ส่งแล้ว: {c.totalPaid} บ.</span>
+                                                    <span>|</span>
+                                                    <span class="text-rose-600 bg-rose-50 px-1.5 py-0.2 rounded font-bold">ยังค้าง: {c.remainingBalance} บ.</span>
                                                 </div>
                                             </div>
                                             <button onClick={() => handleDeleteCustomer(c.id, c.name)} class="text-slate-300 hover:text-red-500 transition p-1 text-xs" title="ลบลูกหนี้">
@@ -208,7 +210,7 @@
                                             </p>
                                             <div>
                                                 {c.statusToday === "ต้องเก็บวันนี้" ? (
-                                                    <button onClick={() => { setSelectedCustomer(c); setPayAmount(c.cyclePayment + (c.accumulatedFine || 0)); setShowPayModal(true); }} class="bg-emerald-500 text-white px-4 py-1.5 rounded-xl text-xs font-bold shadow-sm hover:bg-emerald-600 transition active:scale-95">เก็บเงิน</button>
+                                                    <button onClick={() => { setSelectedCustomer(c); setPayAmount(c.cyclePayment); setShowPayModal(true); }} class="bg-emerald-500 text-white px-4 py-1.5 rounded-xl text-xs font-bold shadow-sm hover:bg-emerald-600 transition active:scale-95">เก็บเงิน</button>
                                                 ) : (
                                                     <span class="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1"><i class="fa-solid fa-circle-check"></i> จ่ายแล้ว</span>
                                                 )}
@@ -226,7 +228,7 @@
                             <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl">
                                 <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center"><i class="fa-solid fa-money-bill-wave text-emerald-500 mr-2"></i> บันทึกการเก็บเงิน</h3>
                                 <p class="text-sm text-slate-600 mb-2">ลูกหนี้: <strong class="text-slate-800">{selectedCustomer.name}</strong></p>
-                                <p class="text-xs text-slate-500 mb-4">ยอดปกติ: {selectedCustomer.cyclePayment} บ. {selectedCustomer.accumulatedFine > 0 && `+ ค่าปรับล่าช้า: ${selectedCustomer.accumulatedFine} บ.`}</p>
+                                <p class="text-xs text-slate-500 mb-4">ยอดปกติประจำดิว: {selectedCustomer.cyclePayment} บ. (ยอดหนี้คงเหลือทั้งหมด: {selectedCustomer.remainingBalance} บ.)</p>
                                 <form onSubmit={handlePayment}>
                                     <div class="mb-5">
                                         <label class="block text-xs font-bold text-slate-500 uppercase mb-2">จำนวนเงินที่เก็บได้จริง (บาท)</label>
