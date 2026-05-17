@@ -109,9 +109,9 @@
 
                 const success = await sendPostRequest(payload);
                 if (success) {
-                    alert("🎉 ออกสัญญาเงินกู้ใหม่เรียบร้อยแล้ว!");
+                    alert("🎉 ออกสัญญาเงินกู้ใหม่เรียบร้อยแล้ว! (จะเริ่มเก็บเงินงวดแรกในวันพรุ่งนี้)");
                     resetForm();
-                    setTimeout(loadAllData, 2500); // หน่วงเวลาเพื่อให้กูเกิลบันทึกเสร็จสิ้นก่อนดึงค่าใหม่
+                    setTimeout(loadAllData, 2500);
                 }
             };
 
@@ -177,7 +177,7 @@
                 const success = await sendPostRequest(payload);
                 if (success) {
                     alert("🗑️ ลบข้อมูลสัญญาออกจากระบบสำเร็จ!");
-                    setTimeout(loadAllData, 2500); // มั่นใจได้ข้อมูลอัปเดตชัวร์ไม่ย้อนกลับมา
+                    setTimeout(loadAllData, 2500);
                 }
             };
 
@@ -187,14 +187,29 @@
                 setLoanDate(new Date().toISOString().split('T')[0]);
             };
 
+            // ตรรกะตรวจสอบว่าเป็นสัญญาที่เพิ่งสร้างวันนี้หรือไม่ เพื่อข้ามการเรียกเก็บเงินวันแรก
+            const isCreatedToday = (dateString) => {
+                if (!dateString) return false;
+                const todayStr = new Date().toISOString().split('T')[0];
+                const cleanLoanStr = dateString.split('T')[0];
+                return todayStr === cleanLoanStr;
+            };
+
             const filtered = customers.filter(c => {
                 const searchTxt = search.toLowerCase();
                 const matchesSearch = (c.name && c.name.toLowerCase().includes(searchTxt)) || (c.id && c.id.toLowerCase().includes(searchTxt));
                 if (!matchesSearch) return false;
-                if (tab === "pending") return c.status !== "จ่ายแล้ว";
+                
+                // แท็บต้องเก็บวันนี้: ต้องยังจ่ายไม่ครบ และ ต้องไม่ใช่สัญญาที่เพิ่งสร้างวันนี้ (เริ่มนับวันถัดไป)
+                if (tab === "pending") {
+                    return c.status !== "จ่ายแล้ว" && !isCreatedToday(c.loan_date);
+                }
                 if (tab === "paid") return c.status === "จ่ายแล้ว";
                 return true;
             });
+
+            // คำนวณตัวเลขสถิติยอดผู้ที่ต้องจัดเก็บในแท็บต่างๆ
+            const pendingCount = customers.filter(c => c.status !== "จ่ายแล้ว" && !isCreatedToday(c.loan_date)).length;
 
             const summary = customers.reduce((acc, c) => {
                 acc.totalPrincipal += parseCleanFloat(c.principal);
@@ -253,7 +268,7 @@
                     {/* Tabs */}
                     <div className="grid grid-cols-3 gap-1 bg-white p-1.5 border-b border-slate-200">
                         <button onClick={() => setTab("all")} className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${tab === 'all' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50'}`}>ทั้งหมด ({customers.length})</button>
-                        <button onClick={() => setTab("pending")} className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${tab === 'pending' ? 'bg-amber-50 text-amber-700' : 'text-slate-500 hover:bg-slate-50'}`}>ต้องเก็บวันนี้ ({customers.filter(c => c.status !== "จ่ายแล้ว").length})</button>
+                        <button onClick={() => setTab("pending")} className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${tab === 'pending' ? 'bg-amber-50 text-amber-700' : 'text-slate-500 hover:bg-slate-50'}`}>ต้องเก็บวันนี้ ({pendingCount})</button>
                         <button onClick={() => setTab("paid")} className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${tab === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-500 hover:bg-slate-50'}`}>จ่ายแล้ว ({customers.filter(c => c.status === "จ่ายแล้ว").length})</button>
                     </div>
 
@@ -262,10 +277,11 @@
                         {loading ? (
                             <div className="text-center py-20 text-slate-400"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-indigo-600 mb-3"></i><p className="text-xs">กำลังประมวลผลการทำงาน...</p></div>
                         ) : filtered.length === 0 ? (
-                            <div className="text-center py-20 text-slate-400 text-sm">📭 ไม่พบข้อมูลลูกหนี้</div>
+                            <div className="text-center py-20 text-slate-400 text-sm">📭 ไม่พบข้อมูลลูกหนี้ในหมวดหมู่นี้</div>
                         ) : (
                             filtered.map(c => {
                                 const hasProfile = profiles.some(p => p.id === c.id);
+                                const todayContract = isCreatedToday(c.loan_date);
                                 return (
                                     <div key={c.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs relative overflow-hidden">
                                         <div className="flex justify-between items-start mb-2">
@@ -280,15 +296,20 @@
                                                 <button onClick={() => handleDeleteCustomer(c.id, c.name)} className="text-rose-500 hover:text-rose-700 p-1.5 text-xs bg-rose-50 rounded-lg border border-rose-100 transition-all cursor-pointer">
                                                     <i className="fa-solid fa-trash-can"></i>
                                                 </button>
-                                                <span className={`text-[11px] font-black px-2.5 py-1 rounded-full ${c.status === "จ่ายแล้ว" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{c.status || "รอดำเนินการ"}</span>
+                                                <span className={`text-[11px] font-black px-2.5 py-1 rounded-full ${c.status === "จ่ายแล้ว" ? "bg-emerald-100 text-emerald-700" : todayContract ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
+                                                    {c.status === "จ่ายแล้ว" ? "จ่ายแล้ว" : todayContract ? "เริ่มพรุ่งนี้" : "ค้างชำระ"}
+                                                </span>
                                             </div>
                                         </div>
 
-                                        <div className="mb-3">
+                                        <div className="mb-3 flex flex-wrap gap-1">
                                             {hasProfile ? (
                                                 <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200"><i className="fa-solid fa-circle-check"></i> ✓ ตรวจพบประวัติแล้ว</span>
                                             ) : (
                                                 <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200"><i className="fa-solid fa-triangle-exclamation"></i> ⚠️ ยังไม่ได้ลงประวัติส่วนตัว</span>
+                                            )}
+                                            {todayContract && (
+                                                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200"><i className="fa-solid fa-clock"></i> สัญญาวันแรก (เว้นเก็บวันนี้)</span>
                                             )}
                                         </div>
 
