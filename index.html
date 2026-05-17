@@ -28,9 +28,12 @@
             
             const [showAddModal, setShowAddModal] = useState(false);
             const [showPayModal, setShowPayModal] = useState(false);
+            const [showEditModal, setShowEditModal] = useState(false); // 📝 เพิ่ม State สำหรับเปิด Modal แก้ไข
             const [selectedUser, setSelectedUser] = useState(null);
             const [payAmount, setPayAmount] = useState("");
 
+            // Form States (ใช้ร่วมกันทั้งเพิ่มและแก้ไข)
+            const [editId, setEditId] = useState(""); // บันทึก ID ที่ต้องการแก้ไข
             const [name, setName] = useState("");
             const [loanType, setLoanType] = useState("daily");
             const [principal, setPrincipal] = useState("");
@@ -62,7 +65,6 @@
                 setLoading(true);
                 setShowAddModal(false);
 
-                // 🔴 ถ้าเป็นดอกลอย ให้บังคับส่งดอกเบี้ยรวมเป็น 0 ไปที่ชีตเลย ไม่ต้องกรอก
                 const finalInterest = loanType === "float" ? 0 : parseFloat(interestRate);
 
                 const payload = {
@@ -82,9 +84,54 @@
                         body: JSON.stringify(payload)
                     });
                     alert("🎉 ออกสัญญาเงินกู้ใหม่สำเร็จ!");
-                    setName(""); setPrincipal(""); setInterestRate(""); setCustomCyclePayment("");
+                    resetForm();
                     setTimeout(loadAllData, 1000);
                 } catch (err) { alert("เกิดข้อผิดพลาด"); setLoading(false); }
+            };
+
+            // 📝 ฟังก์ชันเปิด Modal แก้ไข และดึงข้อมูลเดิมมาใส่ในช่องกรอกข้อมูล
+            const openEditModal = (c) => {
+                setEditId(c.id);
+                setName(c.name);
+                setLoanType(c.loan_type);
+                setPrincipal(c.principal);
+                setInterestRate(c.interest_rate);
+                setCustomDays(c.days_count === "-" ? 0 : c.days_count);
+                setCustomCyclePayment(c.cycle_payment);
+                setLoanDate(c.loan_date ? c.loan_date.split('T')[0] : new Date().toISOString().split('T')[0]);
+                setShowEditModal(true);
+            };
+
+            // 📝 ฟังก์ชันส่งข้อมูลที่แก้ไขไปอัปเดตที่ Google Sheets
+            const handleEditCustomer = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                setShowEditModal(false);
+
+                const finalInterest = loanType === "float" ? 0 : parseFloat(interestRate);
+
+                const payload = {
+                    action: "editCustomer",
+                    id: editId,
+                    name, loanType,
+                    principal: parseFloat(principal),
+                    interestRate: finalInterest,
+                    customDays: parseInt(customDays) || 0,
+                    customCyclePayment: parseFloat(customCyclePayment) || 0,
+                    loanDate
+                };
+
+                try {
+                    await fetch(SCRIPT_URL, {
+                        method: "POST",
+                        mode: "no-cors",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+                    alert("📝 แก้ไขข้อมูลสัญญาเรียบร้อยแล้ว!");
+                    resetForm();
+                    setTimeout(loadAllData, 1000);
+                } catch (err) { alert("เกิดข้อผิดพลาดในการแก้ไข"); setLoading(false); }
             };
 
             const handlePayment = async (e) => {
@@ -115,6 +162,12 @@
                 } catch (err) { alert("เกิดข้อผิดพลาด"); setLoading(false); }
             };
 
+            const resetForm = () => {
+                setEditId(""); setName(""); setLoanType("daily"); setPrincipal(""); 
+                setInterestRate(""); setCustomDays(24); setCustomCyclePayment("");
+                setLoanDate(new Date().toISOString().split('T')[0]);
+            };
+
             const filtered = customers.filter(c => {
                 const matchesSearch = (c.name && c.name.includes(search)) || (c.id && c.id.includes(search));
                 if (!matchesSearch) return false;
@@ -141,7 +194,7 @@
                                 <a href="profile.html" className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-sm transition-all flex items-center gap-1">
                                     <i className="fa-solid fa-address-book"></i> สมุดประวัติ
                                 </a>
-                                <button onClick={() => setShowAddModal(true)} className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-sm transition-all">
+                                <button onClick={() => { resetForm(); setShowAddModal(true); }} className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-sm transition-all">
                                     <i className="fa-solid fa-plus"></i> ออกสัญญาใหม่
                                 </button>
                             </div>
@@ -200,8 +253,12 @@
                                                 <h4 className="font-black text-slate-800 text-base">{c.name}</h4>
                                                 <span className="text-[11px] text-slate-400 font-mono block">ID: {c.id}</span>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <button onClick={() => handleDeleteCustomer(c.id, c.name)} className="text-rose-500 hover:text-rose-700 p-1.5 text-xs bg-rose-50 rounded-lg border border-rose-100 transition-all">
+                                            <div className="flex items-center gap-1.5">
+                                                {/* 📝 ปุ่มดินสอสำหรับกดแก้ไขสัญญา */}
+                                                <button onClick={() => openEditModal(c)} className="text-amber-600 hover:text-amber-700 p-1.5 text-xs bg-amber-50 rounded-lg border border-amber-100 transition-all" title="แก้ไขข้อมูลสัญญา">
+                                                    <i className="fa-solid fa-pen-to-square"></i>
+                                                </button>
+                                                <button onClick={() => handleDeleteCustomer(c.id, c.name)} className="text-rose-500 hover:text-rose-700 p-1.5 text-xs bg-rose-50 rounded-lg border border-rose-100 transition-all" title="ลบสัญญา">
                                                     <i className="fa-solid fa-trash-can"></i>
                                                 </button>
                                                 <span className={`text-[11px] font-black px-2.5 py-1 rounded-full ${c.status === "จ่ายแล้ว" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{c.status}</span>
@@ -269,27 +326,81 @@
                                             />
                                         </div>
                                     </div>
-
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 mb-1">จำนวนวันส่ง / กำหนดตัดรอบ (วัน)</label>
                                         <input type="number" value={customDays} onChange={(e) => setCustomDays(e.target.value)} placeholder="เช่น 24 วัน" className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" />
                                     </div>
-
                                     {loanType === "float" && (
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 mb-1">ยอดเก็บดอกลอยต่อวัน (บาท)</label>
                                             <input type="number" required value={customCyclePayment} onChange={(e) => setCustomCyclePayment(e.target.value)} placeholder="เช่น 100" className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" />
                                         </div>
                                     )}
-
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 mb-1">วันที่เริ่มกู้</label>
                                         <input type="date" value={loanDate} onChange={(e) => setLoanDate(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" />
                                     </div>
-
                                     <div className="flex gap-2 pt-2">
                                         <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 bg-slate-100 text-slate-500 py-2.5 rounded-xl text-xs font-bold">ยกเลิก</button>
                                         <button type="submit" className="flex-1 bg-emerald-500 text-white py-2.5 rounded-xl text-xs font-bold shadow-md">บันทึกสัญญา</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 📝 Modal แก้ไขสัญญา (เพิ่มใหม่) */}
+                    {showEditModal && (
+                        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+                            <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+                                <h3 className="text-base font-black text-slate-800 mb-1"><i className="fa-solid fa-pen-to-square text-amber-500 mr-1"></i> แก้ไขข้อมูลสัญญา</h3>
+                                <p className="text-xs text-slate-400 mb-4">รหัสสัญญาที่แก้ไข: {editId}</p>
+                                <form onSubmit={handleEditCustomer} className="space-y-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">ชื่อ-นามสกุล ลูกหนี้</label>
+                                        <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">ประเภทเงินกู้</label>
+                                        <select value={loanType} onChange={(e) => setLoanType(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white">
+                                            <option value="daily">รายวัน (ตัดต้นตัดดอก)</option>
+                                            <option value="float">ดอกลอย</option>
+                                        </select>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 mb-1">เงินต้น (บาท)</label>
+                                            <input type="number" required value={principal} onChange={(e) => setPrincipal(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 mb-1">ดอกเบี้ยรวม (บาท)</label>
+                                            <input 
+                                                type="number" 
+                                                required={loanType === "daily"} 
+                                                disabled={loanType === "float"} 
+                                                value={loanType === "float" ? "0" : interestRate} 
+                                                onChange={(e) => setInterestRate(e.target.value)} 
+                                                className={`w-full border rounded-xl px-3 py-2 text-sm ${loanType === "float" ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed" : "border-slate-200"}`} 
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">จำนวนวันส่ง / กำหนดตัดรอบ (วัน)</label>
+                                        <input type="number" value={customDays} onChange={(e) => setCustomDays(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" />
+                                    </div>
+                                    {loanType === "float" && (
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 mb-1">ยอดเก็บดอกลอยต่อวัน (บาท)</label>
+                                            <input type="number" required value={customCyclePayment} onChange={(e) => setCustomCyclePayment(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" />
+                                        </div>
+                                    )}
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">วันที่กู้</label>
+                                        <input type="date" value={loanDate} onChange={(e) => setLoanDate(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" />
+                                    </div>
+                                    <div className="flex gap-2 pt-2">
+                                        <button type="button" onClick={() => { setShowEditModal(false); resetForm(); }} className="flex-1 bg-slate-100 text-slate-500 py-2.5 rounded-xl text-xs font-bold">ยกเลิก</button>
+                                        <button type="submit" className="flex-1 bg-amber-500 text-white py-2.5 rounded-xl text-xs font-bold shadow-md">บันทึกการแก้ไข</button>
                                     </div>
                                 </form>
                             </div>
