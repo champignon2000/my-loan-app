@@ -16,7 +16,7 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // ⚠️ อย่าลืมใส่ลิงก์ Web App URL ปัจจุบันของคุณนะครับ
+        // ⚠️ แก้ไขตรงนี้: ใส่ลิงก์ Web App URL ปัจจุบันที่คุณเพิ่ง Deploy มาใหม่
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzvY4sC2vHdSM7O5qVYq1ktsjlkhk9mL_y5fpuqql_HJ14iVfBK2piaCOHsAUopVHlB/exec";
 
         function App() {
@@ -28,12 +28,12 @@
             
             const [showAddModal, setShowAddModal] = useState(false);
             const [showPayModal, setShowPayModal] = useState(false);
-            const [showEditModal, setShowEditModal] = useState(false); // 📝 เพิ่ม State สำหรับเปิด Modal แก้ไข
+            const [showEditModal, setShowEditModal] = useState(false); 
             const [selectedUser, setSelectedUser] = useState(null);
             const [payAmount, setPayAmount] = useState("");
 
-            // Form States (ใช้ร่วมกันทั้งเพิ่มและแก้ไข)
-            const [editId, setEditId] = useState(""); // บันทึก ID ที่ต้องการแก้ไข
+            // ฟอร์มข้อมูลสัญญา
+            const [editId, setEditId] = useState(""); 
             const [name, setName] = useState("");
             const [loanType, setLoanType] = useState("daily");
             const [principal, setPrincipal] = useState("");
@@ -89,7 +89,6 @@
                 } catch (err) { alert("เกิดข้อผิดพลาด"); setLoading(false); }
             };
 
-            // 📝 ฟังก์ชันเปิด Modal แก้ไข และดึงข้อมูลเดิมมาใส่ในช่องกรอกข้อมูล
             const openEditModal = (c) => {
                 setEditId(c.id);
                 setName(c.name);
@@ -102,7 +101,6 @@
                 setShowEditModal(true);
             };
 
-            // 📝 ฟังก์ชันส่งข้อมูลที่แก้ไขไปอัปเดตที่ Google Sheets
             const handleEditCustomer = async (e) => {
                 e.preventDefault();
                 setLoading(true);
@@ -111,9 +109,7 @@
                 const finalInterest = loanType === "float" ? 0 : parseFloat(interestRate);
 
                 const payload = {
-                    action: "editCustomer",
-                    id: editId,
-                    name, loanType,
+                    action: "editCustomer", id: editId, name, loanType,
                     principal: parseFloat(principal),
                     interestRate: finalInterest,
                     customDays: parseInt(customDays) || 0,
@@ -152,6 +148,7 @@
                 } catch (err) { alert("เกิดข้อผิดพลาด"); setLoading(false); }
             };
 
+            // 🔴 แก้ไขระบบลบข้อมูล: ยิงผ่าน URL แบบ GET ทะลุระบบป้องกัน แถวในชีตหายขาด 100%
             const handleDeleteCustomer = async (id, name) => {
                 if (!confirm(`⚠️ คุณแน่ใจไหมที่จะลบสัญญาของ "${name}" (${id})? ข้อมูลในชีตจะหายไปถาวร`)) return;
                 setLoading(true);
@@ -237,7 +234,7 @@
                         <button onClick={() => setTab("paid")} className={`py-2 text-xs font-bold rounded-lg transition-all ${tab === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-500'}`}>จ่ายแล้ว ({customers.filter(c => c.status === "จ่ายแล้ว").length})</button>
                     </div>
 
-                    {/* รายชื่อ */}
+                    {/* รายชื่อลูกค้า */}
                     <div className="flex-1 p-3 space-y-3 overflow-y-auto">
                         {loading ? (
                             <div className="text-center py-20 text-slate-400"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-indigo-600 mb-3"></i><p className="text-xs">กำลังเชื่อมต่อตารางบัญชี...</p></div>
@@ -254,10 +251,11 @@
                                                 <span className="text-[11px] text-slate-400 font-mono block">ID: {c.id}</span>
                                             </div>
                                             <div className="flex items-center gap-1.5">
-                                                {/* 📝 ปุ่มดินสอสำหรับกดแก้ไขสัญญา */}
+                                                {/* Button แก้ไข */}
                                                 <button onClick={() => openEditModal(c)} className="text-amber-600 hover:text-amber-700 p-1.5 text-xs bg-amber-50 rounded-lg border border-amber-100 transition-all" title="แก้ไขข้อมูลสัญญา">
                                                     <i className="fa-solid fa-pen-to-square"></i>
                                                 </button>
+                                                {/* Button ลบ */}
                                                 <button onClick={() => handleDeleteCustomer(c.id, c.name)} className="text-rose-500 hover:text-rose-700 p-1.5 text-xs bg-rose-50 rounded-lg border border-rose-100 transition-all" title="ลบสัญญา">
                                                     <i className="fa-solid fa-trash-can"></i>
                                                 </button>
@@ -321,7 +319,7 @@
                                                 disabled={loanType === "float"} 
                                                 value={loanType === "float" ? "0" : interestRate} 
                                                 onChange={(e) => setInterestRate(e.target.value)} 
-                                                placeholder={loanType === "float" ? "ระบบดอกลอยไม่ต้องกรอก" : "เช่น 1000"} 
+                                                placeholder={loanType === "float" ? "ไม่ต้องกรอกสำหรับดอกลอย" : "เช่น 1000"} 
                                                 className={`w-full border rounded-xl px-3 py-2 text-sm ${loanType === "float" ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed" : "border-slate-200"}`} 
                                             />
                                         </div>
@@ -349,7 +347,7 @@
                         </div>
                     )}
 
-                    {/* 📝 Modal แก้ไขสัญญา (เพิ่มใหม่) */}
+                    {/* Modal แก้ไขสัญญา */}
                     {showEditModal && (
                         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
                             <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -431,7 +429,7 @@
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        root.render((<App />));
     </script>
 </body>
 </html>
