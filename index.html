@@ -17,7 +17,7 @@
         const { useState, useEffect } = React;
 
         // ⚠️ ตรวจสอบให้มั่นใจว่าลิงก์นี้ตรงกับที่ก๊อปปี้มาจาก Google Apps Script ล่าสุดครับ
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby6c8mRKZztBZUMmfBPlMw7G-RYZLEgkdX8gCZitxgcASWXKdTsx7aL-UG_59NedjDT/exec";
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx9NARjOg5972eVz6Uirjk4J3IL9p-Y4Y0YLvDl4Ffagdb_TNsh3Zh0rMXX2WF4y8rN/exec";
 
         function App() {
             const [customers, setCustomers] = useState([]);
@@ -56,7 +56,7 @@
                     setCustomers(dataCust);
                     setProfiles(dataProf);
                 } catch (err) {
-                    alert("เชื่อมต่อฐานข้อมูลไม่สำเร็จ กรุณาตรวจสอบการตั้งค่าลิงก์เว็บแอป SCRIPT_URL");
+                    console.error("เชื่อมต่อฐานข้อมูลไม่สำเร็จ", err);
                 }
                 setLoading(false);
             };
@@ -329,7 +329,7 @@
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(/App />);
+        root.render(<App />);
     </script>
 </body>
 </html>
