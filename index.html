@@ -41,7 +41,7 @@
             const [loanType, setLoanType] = useState("daily");
             const [principal, setPrincipal] = useState("");
             const [interestRate, setInterestRate] = useState("");
-            const [customDays, setCustomDays] = useState(24);
+            const [customDays, setCustomDays] = useState(1); // เปลี่ยนค่าเริ่มต้นเป็น 1 วัน (ส่งทุกวัน)
             const [customCyclePayment, setCustomCyclePayment] = useState("");
             const [loanDate, setLoanDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -102,14 +102,14 @@
                     action: "addCustomer", name, loanType,
                     principal: parseFloat(principal),
                     interestRate: finalInterest,
-                    customDays: parseInt(customDays) || 0,
+                    customDays: parseInt(customDays) || 1,
                     customCyclePayment: parseFloat(customCyclePayment) || 0,
                     loanDate
                 };
 
                 const success = await sendPostRequest(payload);
                 if (success) {
-                    alert("🎉 ออกสัญญาเงินกู้ใหม่เรียบร้อยแล้ว! (จะเริ่มเก็บเงินงวดแรกในวันพรุ่งนี้)");
+                    alert("🎉 ออกสัญญาเงินกู้ใหม่เรียบร้อยแล้ว! (จะเริ่มเก็บเงินงวดแรกในรอบวันถัดไป)");
                     resetForm();
                     setTimeout(loadAllData, 2500);
                 }
@@ -121,7 +121,7 @@
                 setLoanType(c.loan_type || "daily");
                 setPrincipal(c.principal);
                 setInterestRate(c.interest_rate);
-                setCustomDays(c.days_count === "-" ? 0 : c.days_count);
+                setCustomDays(c.days_count === "-" ? 1 : c.days_count);
                 setCustomCyclePayment(c.cycle_payment);
                 setLoanDate(c.loan_date ? c.loan_date.split('T')[0] : new Date().toISOString().split('T')[0]);
                 setShowEditModal(true);
@@ -136,7 +136,7 @@
                     action: "editCustomer", id: editId, name, loanType,
                     principal: parseFloat(principal),
                     interestRate: finalInterest,
-                    customDays: parseInt(customDays) || 0,
+                    customDays: parseInt(customDays) || 1,
                     customCyclePayment: parseFloat(customCyclePayment) || 0,
                     loanDate
                 };
@@ -183,11 +183,10 @@
 
             const resetForm = () => {
                 setEditId(""); setName(""); setLoanType("daily"); setPrincipal(""); 
-                setInterestRate(""); setCustomDays(24); setCustomCyclePayment("");
+                setInterestRate(""); setCustomDays(1); setCustomCyclePayment("");
                 setLoanDate(new Date().toISOString().split('T')[0]);
             };
 
-            // ตรรกะตรวจสอบว่าเป็นสัญญาที่เพิ่งสร้างวันนี้หรือไม่ เพื่อข้ามการเรียกเก็บเงินวันแรก
             const isCreatedToday = (dateString) => {
                 if (!dateString) return false;
                 const todayStr = new Date().toISOString().split('T')[0];
@@ -200,7 +199,6 @@
                 const matchesSearch = (c.name && c.name.toLowerCase().includes(searchTxt)) || (c.id && c.id.toLowerCase().includes(searchTxt));
                 if (!matchesSearch) return false;
                 
-                // แท็บต้องเก็บวันนี้: ต้องยังจ่ายไม่ครบ และ ต้องไม่ใช่สัญญาที่เพิ่งสร้างวันนี้ (เริ่มนับวันถัดไป)
                 if (tab === "pending") {
                     return c.status !== "จ่ายแล้ว" && !isCreatedToday(c.loan_date);
                 }
@@ -208,7 +206,6 @@
                 return true;
             });
 
-            // คำนวณตัวเลขสถิติยอดผู้ที่ต้องจัดเก็บในแท็บต่างๆ
             const pendingCount = customers.filter(c => c.status !== "จ่ายแล้ว" && !isCreatedToday(c.loan_date)).length;
 
             const summary = customers.reduce((acc, c) => {
@@ -297,7 +294,7 @@
                                                     <i className="fa-solid fa-trash-can"></i>
                                                 </button>
                                                 <span className={`text-[11px] font-black px-2.5 py-1 rounded-full ${c.status === "จ่ายแล้ว" ? "bg-emerald-100 text-emerald-700" : todayContract ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
-                                                    {c.status === "จ่ายแล้ว" ? "จ่ายแล้ว" : todayContract ? "เริ่มพรุ่งนี้" : "ค้างชำระ"}
+                                                    {c.status === "จ่ายแล้ว" ? "จ่ายแล้ว" : todayContract ? "เริ่มงวดถัดไป" : "ค้างชำระ"}
                                                 </span>
                                             </div>
                                         </div>
@@ -309,15 +306,16 @@
                                                 <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200"><i className="fa-solid fa-triangle-exclamation"></i> ⚠️ ยังไม่ได้ลงประวัติส่วนตัว</span>
                                             )}
                                             {todayContract && (
-                                                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200"><i className="fa-solid fa-clock"></i> สัญญาวันแรก (เว้นเก็บวันนี้)</span>
+                                                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200"><i className="fa-solid fa-clock"></i> สัญญาวันแรก (เริ่มเก็บรอบถัดไป)</span>
                                             )}
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-y-1.5 text-xs text-slate-600 border-t border-slate-100 pt-2.5 mb-3">
                                             <div>ยอดรวมสัญญา: <strong className="text-slate-900">{parseCleanFloat(c.total_amount).toLocaleString()} บ.</strong></div>
                                             <div>ยอดค้างชำระ: <strong className="text-rose-600">{parseCleanFloat(c.remaining_balance).toLocaleString()} บ.</strong></div>
-                                            <div>เก็บงวดละ: <span className="text-indigo-600 font-bold">{parseCleanFloat(c.cycle_payment).toLocaleString()} บ.</span> ({c.days_count || "-"} วัน)</div>
-                                            <div>ประเภทสัญญากู้: <span className="text-slate-500 font-medium">{c.loan_type === "float" ? "ดอกลอย" : "รายวัน"}</span></div>
+                                            <div>รอบส่งงาน: <span className="text-indigo-600 font-bold">ทุก ๆ {c.days_count || "1"} วัน</span></div>
+                                            <div>ยอดจัดเก็บต่อรอบ: <span className="text-emerald-600 font-black">{parseCleanFloat(c.cycle_payment).toLocaleString()} บ.</span></div>
+                                            <div className="col-span-2 text-slate-400 text-[11px]">ประเภทสัญญากู้: {c.loan_type === "float" ? "ดอกลอย" : "รายวัน (ตัดต้นตัดดอก)"}</div>
                                         </div>
 
                                         {c.status !== "จ่ายแล้ว" && (
@@ -359,12 +357,13 @@
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">จำนวนวันส่ง (วัน)</label>
-                                        <input type="number" value={customDays} onChange={(e) => setCustomDays(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none" />
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">ระยะเวลาต่อการส่งยอด/ดอก (วัน)</label>
+                                        <span className="text-[10px] text-slate-400 block mb-1">* ตัวอย่าง: ใส่เลข 1 = ส่งทุกวัน, ใส่เลข 3 = ทุก 3 วันส่ง 1 ครั้ง</span>
+                                        <input type="number" min="1" value={customDays} onChange={(e) => setCustomDays(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none" />
                                     </div>
                                     {loanType === "float" && (
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-500 mb-1">ยอดเก็บดอกลอยต่อวัน (บาท)</label>
+                                            <label className="block text-xs font-bold text-slate-500 mb-1">ยอดเก็บต่อรอบการส่ง (บาท)</label>
                                             <input type="number" required value={customCyclePayment} onChange={(e) => setCustomCyclePayment(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none" />
                                         </div>
                                     )}
@@ -409,12 +408,12 @@
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">จำนวนวันส่ง (วัน)</label>
-                                        <input type="number" value={customDays} onChange={(e) => setCustomDays(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none" />
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">ระยะเวลาต่อการส่งยอด/ดอก (วัน)</label>
+                                        <input type="number" min="1" value={customDays} onChange={(e) => setCustomDays(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none" />
                                     </div>
                                     {loanType === "float" && (
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-500 mb-1">ยอดเก็บดอกลอยต่อวัน (บาท)</label>
+                                            <label className="block text-xs font-bold text-slate-500 mb-1">ยอดเก็บต่อรอบการส่ง (บาท)</label>
                                             <input type="number" required value={customCyclePayment} onChange={(e) => setCustomCyclePayment(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none" />
                                         </div>
                                     )}
