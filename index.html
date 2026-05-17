@@ -16,7 +16,7 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // ⚠️ อย่าลืมเปลี่ยนเป็นลิงก์ Web App URL ปัจจุบันของคุณนะครับ
+        // ⚠️ อย่าลืมใส่ลิงก์ Web App URL ปัจจุบันของคุณนะครับ
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzvY4sC2vHdSM7O5qVYq1ktsjlkhk9mL_y5fpuqql_HJ14iVfBK2piaCOHsAUopVHlB/exec";
 
         function App() {
@@ -62,11 +62,14 @@
                 setLoading(true);
                 setShowAddModal(false);
 
+                // 🔴 ถ้าเป็นดอกลอย ให้บังคับส่งดอกเบี้ยรวมเป็น 0 ไปที่ชีตเลย ไม่ต้องกรอก
+                const finalInterest = loanType === "float" ? 0 : parseFloat(interestRate);
+
                 const payload = {
                     action: "addCustomer", name, loanType,
                     principal: parseFloat(principal),
-                    interestRate: parseFloat(interestRate),
-                    customDays: parseInt(customDays),
+                    interestRate: finalInterest,
+                    customDays: parseInt(customDays) || 0,
                     customCyclePayment: parseFloat(customCyclePayment) || 0,
                     loanDate
                 };
@@ -255,11 +258,18 @@
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 mb-1">ดอกเบี้ยรวม (บาท)</label>
-                                            <input type="number" required value={interestRate} onChange={(e) => setInterestRate(e.target.value)} placeholder="เช่น 1000" className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" />
+                                            <input 
+                                                type="number" 
+                                                required={loanType === "daily"} 
+                                                disabled={loanType === "float"} 
+                                                value={loanType === "float" ? "0" : interestRate} 
+                                                onChange={(e) => setInterestRate(e.target.value)} 
+                                                placeholder={loanType === "float" ? "ระบบดอกลอยไม่ต้องกรอก" : "เช่น 1000"} 
+                                                className={`w-full border rounded-xl px-3 py-2 text-sm ${loanType === "float" ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed" : "border-slate-200"}`} 
+                                            />
                                         </div>
                                     </div>
 
-                                    {/* 🔴 ดึงช่อง "จำนวนวันส่ง" กลับมาเปิดให้ระบุค่าได้เสมอ ทั้งรายวันและดอกลอย */}
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 mb-1">จำนวนวันส่ง / กำหนดตัดรอบ (วัน)</label>
                                         <input type="number" value={customDays} onChange={(e) => setCustomDays(e.target.value)} placeholder="เช่น 24 วัน" className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" />
