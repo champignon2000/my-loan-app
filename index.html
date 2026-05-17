@@ -16,7 +16,7 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // ⚠️ นำลิงก์จากข้อ 1 (New Deployment จาก Apps Script) มาวางตรงนี้แทนตัวเดิมครับ
+        // ⚠️ อย่าลืมเปลี่ยนเป็นลิงก์ Web App URL ปัจจุบันของคุณนะครับ
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzvY4sC2vHdSM7O5qVYq1ktsjlkhk9mL_y5fpuqql_HJ14iVfBK2piaCOHsAUopVHlB/exec";
 
         function App() {
@@ -46,18 +46,14 @@
                 try {
                     const resCust = await fetch(`${SCRIPT_URL}?action=getCustomers`);
                     const dataCust = await resCust.json();
-                    
                     let dataProf = [];
                     try {
                         const resProf = await fetch(`${SCRIPT_URL}?action=getProfiles`);
                         dataProf = await resProf.json();
-                    } catch(e) { console.log("ยังไม่มีประวัติในระบบ"); }
-
+                    } catch(e) {}
                     setCustomers(dataCust);
                     setProfiles(dataProf);
-                } catch (err) {
-                    console.error("เชื่อมต่อฐานข้อมูลไม่สำเร็จ", err);
-                }
+                } catch (err) { console.error(err); }
                 setLoading(false);
             };
 
@@ -93,17 +89,12 @@
                 if (!payAmount || parseFloat(payAmount) <= 0) return;
                 setLoading(true);
                 setShowPayModal(false);
-
                 try {
                     await fetch(SCRIPT_URL, {
                         method: "POST",
                         mode: "no-cors",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            action: "recordPayment",
-                            id: selectedUser.id,
-                            amount: parseFloat(payAmount)
-                        })
+                        body: JSON.stringify({ action: "recordPayment", id: selectedUser.id, amount: parseFloat(payAmount) })
                     });
                     alert(`✅ บันทึกการจ่ายเงิน ${payAmount} บาท เรียบร้อย!`);
                     setPayAmount("");
@@ -111,23 +102,14 @@
                 } catch (err) { alert("เกิดข้อผิดพลาด"); setLoading(false); }
             };
 
-            // 🛠️ ปรับปรุงความเร็วในการอัปเดตหน้าจอหลังจากลบข้อมูลในชีตเสร็จสิ้น
             const handleDeleteCustomer = async (id, name) => {
-                if (!confirm(`⚠️ คุณแน่ใจไหมที่จะลบสัญญาของ "${name}" (${id}) ข้อมูลในชีตจะหายไปถาวร?`)) return;
+                if (!confirm(`⚠️ คุณแน่ใจไหมที่จะลบสัญญาของ "${name}" (${id})? ข้อมูลในชีตจะหายไปถาวร`)) return;
                 setLoading(true);
                 try {
-                    await fetch(SCRIPT_URL, {
-                        method: "POST",
-                        mode: "no-cors",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ action: "deleteCustomer", id: id })
-                    });
-                    alert("🗑️ ลบข้อมูลสัญญาออกจาก Google Sheets เรียบร้อย!");
+                    await fetch(`${SCRIPT_URL}?action=deleteCustomer&id=${id}`);
+                    alert("🗑️ ลบข้อมูลออกจาก Google Sheets เรียบร้อยแล้ว!");
                     setTimeout(loadAllData, 1000);
-                } catch (err) { 
-                    alert("เกิดข้อผิดพลาดในการลบข้อมูล"); 
-                    setLoading(false); 
-                }
+                } catch (err) { alert("เกิดข้อผิดพลาด"); setLoading(false); }
             };
 
             const filtered = customers.filter(c => {
@@ -138,17 +120,11 @@
                 return true;
             });
 
-            // 📊 ฟังก์ชันคำนวณผลรวมสำหรับหน้าสรุปข้อมูล (Dashboard สรุปเงิน)
             const summary = customers.reduce((acc, c) => {
-                const p = parseFloat(c.principal) || 0;
-                const i = parseFloat(c.interest_rate) || 0;
-                const rem = parseFloat(c.remaining_balance) || 0;
-                const paid = parseFloat(c.paid_amount) || 0;
-
-                acc.totalPrincipal += p;
-                acc.totalInterest += i;
-                acc.totalRemaining += rem;
-                acc.totalPaid += paid;
+                acc.totalPrincipal += parseFloat(c.principal) || 0;
+                acc.totalInterest += parseFloat(c.interest_rate) || 0;
+                acc.totalRemaining += parseFloat(c.remaining_balance) || 0;
+                acc.totalPaid += parseFloat(c.paid_amount) || 0;
                 return acc;
             }, { totalPrincipal: 0, totalInterest: 0, totalRemaining: 0, totalPaid: 0 });
 
@@ -173,7 +149,7 @@
                         </div>
                     </div>
 
-                    {/* 📊 Dashboard สรุปเงินทุน */}
+                    {/* Dashboard */}
                     <div className="p-3 bg-gradient-to-b from-indigo-50 to-slate-50 border-b border-slate-200">
                         <div className="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200/60">
                             <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 block mb-2"><i className="fa-solid fa-chart-pie text-indigo-500 mr-1"></i> ภาพรวมเงินทุนในระบบ</span>
@@ -283,12 +259,13 @@
                                         </div>
                                     </div>
 
-                                    {loanType === "daily" ? (
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 mb-1">จำนวนวันส่ง (วัน)</label>
-                                            <input type="number" value={customDays} onChange={(e) => setCustomDays(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" />
-                                        </div>
-                                    ) : (
+                                    {/* 🔴 ดึงช่อง "จำนวนวันส่ง" กลับมาเปิดให้ระบุค่าได้เสมอ ทั้งรายวันและดอกลอย */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">จำนวนวันส่ง / กำหนดตัดรอบ (วัน)</label>
+                                        <input type="number" value={customDays} onChange={(e) => setCustomDays(e.target.value)} placeholder="เช่น 24 วัน" className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" />
+                                    </div>
+
+                                    {loanType === "float" && (
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 mb-1">ยอดเก็บดอกลอยต่อวัน (บาท)</label>
                                             <input type="number" required value={customCyclePayment} onChange={(e) => setCustomCyclePayment(e.target.value)} placeholder="เช่น 100" className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" />
