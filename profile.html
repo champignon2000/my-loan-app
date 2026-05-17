@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบสมุดประวัติและข้อมูลส่วนตัวลูกหนี้</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-100 min-h-screen font-sans antialiased text-slate-800">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // ⚠️ วางลิงก์เว็บแอปตัวเดียวกับหน้าแรกเพื่อให้เขียนเชื่อมฐานข้อมูลที่เดียวกันครับ
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx9NARjOg5972eVz6Uirjk4J3IL9p-Y4Y0YLvDl4Ffagdb_TNsh3Zh0rMXX2WF4y8rN/exec";
+
+        function App() {
+            const [profiles, setProfiles] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [search, setSearch] = useState("");
+            
+            const [showAddModal, setShowAddModal] = useState(false);
+            const [showViewModal, setShowViewModal] = useState(false);
+            const [selectedProfile, setSelectedProfile] = useState(null);
+            
+            // กล่องข้อความแชทเพื่อใช้ประมวลคำอัตโนมัติ
+            const [rawText, setRawText] = useState("");
+            
+            // ตัวแปรแบบฟอร์ม
+            const [customerID, setCustomerID] = useState("");
+            const [phone, setPhone] = useState("");
+            const [address, setAddress] = useState("");
+            const [idCardNumber, setIdCardNumber] = useState("");
+            const [guarantor, setGuarantor] = useState("");
+            const [notes, setNotes] = useState("");
+            
+            // ข้อมูลไฟล์รูปแปลงเป็น string Base64
+            const [imgCard, setImgCard] = useState("");
+            const [imgSelfie, setImgSelfie] = useState("");
+            const [imgContract, setImgContract] = useState("");
+
+            useEffect(() => { fetchProfiles(); }, []);
+
+            const fetchProfiles = async () => {
+                setLoading(true);
+                try {
+                    const res = await fetch(`${SCRIPT_URL}?action=getProfiles`);
+                    const data = await res.json();
+                    setProfiles(data);
+                } catch (err) {
+                    alert("ไม่สามารถดึงข้อมูลโปรไฟล์ประวัติได้");
+                }
+                setLoading(false);
+            };
+
+            // ระบบสแกนและดึงคำอัตโนมัติจากกล่องข้อความ
+            const handleTextParse = () => {
+                if (!rawText.trim()) return;
+                
+                // ค้นหา ID สัญญาเงินกู้ เช่น LN-123456
+                const idMatch = rawText.match(/LN-\d{6}/i);
+                if (idMatch) setCustomerID(idMatch[0].toUpperCase());
+
+                // ค้นหาเบอร์โทรศัพท์ 9-10 หลัก
+                const phoneMatch = rawText.match(/(0\d{8,9})/);
+                if (phoneMatch) setPhone(phoneMatch[1]);
+
+                // ค้นหาเลขบัตรประชาชน 13 หลัก
+                const idCardMatch = rawText.match(/(\d{13})/);
+                if (idCardMatch) setIdCardNumber(idCardMatch[1]);
+
+                // ค้นหาคีย์เวิร์ดชื่อคนค้ำ
+                const guarantorMatch = rawText.match(/(?:คนค้ำ|ผู้ค้ำ|ค้ำชื่อ)\s*([^\s\n]+)/);
+                if (guarantorMatch) setGuarantor(guarantorMatch[1]);
+
+                // ค้นหาคีย์เวิร์ดที่อยู่
+                const addressMatch = rawText.match(/(?:ที่อยู่|บ้านเลขที่)\s*([^\n\r]+)/);
+                if (addressMatch) setAddress(addressMatch[1]);
+
+                alert("🔮 ดึงและกรอกข้อมูลคำค้นหาลงในช่องฟอร์มให้อัตโนมัติเรียบร้อย!");
+            };
+
+            // แปลงไฟล์รูปภาพเป็น Base64 String เพื่ออัปโหลดเข้าตารางแผ่นงาน
+            const handleFileChange = (e, setBase64) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setBase64(reader.result);
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const handleAddProfile = async (e) => {
+                e.preventDefault();
+                if (!customerID) { alert("กรุณากรอกรหัสสัญญาเงินกู้ให้ถูกต้อง"); return; }
+                setLoading(true);
+                setShowAddModal(false);
+
+                try {
+                    await fetch(SCRIPT_URL, {
+                        method: "POST",
+                        mode: "no-cors",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            action: "addProfile",
+                            id: customerID.trim().toUpperCase(),
+                            phone, address, idCardNumber, guarantor, notes,
+                            imgCard, imgSelfie, imgContract
+                        })
+                    });
+                    
+                    // แจ้งเตือนความสำเร็จและเคลียร์หน้าฟอร์ม
+                    alert("✅ บันทึกเอกสารและประวัติข้อมูลส่วนตัวลูกหนี้สำเร็จเรียบร้อย!");
+                    setCustomerID(""); setPhone(""); setAddress(""); setIdCardNumber(""); setGuarantor(""); setNotes("");
+                    setImgCard(""); setImgSelfie(""); setImgContract(""); setRawText("");
+                    setTimeout(fetchProfiles, 1500);
+                } catch (err) { alert("เกิดข้อผิดพลาดในการส่งข้อมูล"); setLoading(false); }
+            };
+
+            const filteredProfiles = profiles.filter(p => 
+                p.id.toLowerCase().includes(search.toLowerCase()) || 
+                p.phone.includes(search)
+            );
+
+            return (
+                <div className="max-w-md mx-auto min-h-screen flex flex-col bg-slate-50 shadow-2xl border-x border-slate-200">
+                    {/* Header */}
+                    <div className="bg-gradient-to-r from-purple-700 to-indigo-800 text-white p-4 sticky top-0 z-10 shadow-md">
+                        <div className="flex justify-between items-center mb-3">
+                            <a href="index.html" className="bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1 transition-all">
+                                <i className="fa-solid fa-arrow-left"></i> หน้าเก็บเงิน
+                            </a>
+                            <h1 className="text-base font-black tracking-tight">📁 สมุดประวัติส่วนตัว</h1>
+                            <button onClick={() => setShowAddModal(true)} className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-md transition-all">
+                                <i className="fa-solid fa-plus"></i> บันทึกประวัติใหม่
+                            </button>
+                        </div>
+                        <div className="relative">
+                            <input type="text" placeholder="ค้นหาด้วยรหัสสัญญา หรือเบอร์โทร..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-white/15 text-white placeholder-purple-200 pl-10 pr-4 py-2.5 rounded-xl text-sm focus:outline-none focus:bg-white focus:text-slate-900 transition-all" />
+                            <i className="fa-solid fa-magnifying-glass absolute left-3.5 top-3.5 text-purple-200 pointer-events-none"></i>
+                        </div>
+                    </div>
+
+                    {/* รายชื่อสมุดประวัติ */}
+                    <div className="flex-1 p-3 space-y-3 overflow-y-auto">
+                        {loading ? (
+                            <div className="text-center py-20 text-slate-400"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-purple-600 mb-3"></i><p className="text-xs">กำลังค้นหาข้อมูลส่วนตัว...</p></div>
+                        ) : filteredProfiles.length === 0 ? (
+                            <div className="text-center py-20 text-slate-400 text-sm">📭 ยังไม่มีการบันทึกประวัติข้อมูลส่วนตัวในระบบ</div>
+                        ) : (
+                            filteredProfiles.map(p => (
+                                <div key={p.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col gap-2">
+                                    <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                                        <span className="font-black text-slate-700 text-sm bg-slate-100 px-2.5 py-1 rounded-lg"><i className="fa-solid fa-file-contract mr-1 text-purple-600"></i> สัญญา: {p.id}</span>
+                                        <button onClick={() => { setSelectedProfile(p); setShowViewModal(true); }} className="bg-purple-50 text-purple-700 hover:bg-purple-100 text-xs font-black px-3 py-1.5 rounded-xl border border-purple-200 transition-all">
+                                            <i className="fa-solid fa-eye mr-1"></i> ดูรูปเอกสารหลักฐาน
+                                        </button>
+                                    </div>
+                                    <div className="text-xs text-slate-600 space-y-1 pt-1">
+                                        <div><i className="fa-solid fa-phone text-slate-400 mr-1.5 w-4"></i>เบอร์ติดต่อ: <strong>{p.phone || "-"}</strong></div>
+                                        <div><i className="fa-solid fa-id-card text-slate-400 mr-1.5 w-4"></i>เลขบัตรประชาชน: <span>{p.idCardNumber || "-"}</span></div>
+                                        <div><i className="fa-solid fa-user-shield text-slate-400 mr-1.5 w-4"></i>คนค้ำประกัน: <span>{p.guarantor || "-"}</span></div>
+                                        <div className="text-slate-500 bg-slate-50 p-2 rounded-lg mt-1"><i className="fa-solid fa-map-marker-alt text-rose-500 mr-1"></i>ที่อยู่: {p.address || "-"}</div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    {/* Modal บันทึกประวัติ + กล่องข้อความ */}
+                    {showAddModal && (
+                        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+                            <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl max-h-[92vh] overflow-y-auto">
+                                <h3 className="text-base font-black text-slate-800 mb-3"><i className="fa-solid fa-address-card text-purple-600 mr-1"></i> บันทึกประวัติและเอกสารลูกหนี้</h3>
+                                
+                                {/* กล่องสแกนคำแชทไลน์อัตโนมัติ */}
+                                <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 mb-4 space-y-2">
+                                    <label className="block text-[11px] font-black text-purple-900"><i className="fa-solid fa-wand-magic-sparkles mr-1"></i> คัดลอกแชทส่วนตัวลูกหนี้มาวางตรงนี้เพื่อกรอกข้อมูลให้อัตโนมัติ</label>
+                                    <textarea placeholder="ตัวอย่างข้อความ: รหัสสัญญา LN-123456 เบอร์โทร 0812345678 เลขบัตร 1234567890123 ที่อยู่จัดส่ง..." value={rawText} onChange={(e) => setRawText(e.target.value)} className="w-full text-xs p-2 bg-white border border-purple-200 rounded-lg focus:outline-none" rows="2"></textarea>
+                                    <button type="button" onClick={handleTextParse} className="w-full bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold py-1.5 rounded-lg transition-all">
+                                        ✨ สแกนคำค้นหาและกรอกข้อมูลทันที
+                                    </button>
+                                </div>
+
+                                <form onSubmit={handleAddProfile} className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">รหัสสัญญาเงินกู้ (ต้องสะกดตรงกับหน้าหลัก)</label>
+                                        <input type="text" required placeholder="เช่น LN-123456" value={customerID} onChange={(e) => setCustomerID(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-black text-purple-700 uppercase bg-slate-50" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 mb-1">เบอร์โทรศัพท์</label>
+                                            <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="08XXXXXXXX" className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 mb-1">เลขบัตรประชาชน</label>
+                                            <input type="text" value={idCardNumber} onChange={(e) => setIdCardNumber(e.target.value)} placeholder="เลข 13 หลัก" className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">ที่อยู่ปัจจุบัน / พิกัดที่ตั้งบ้าน</label>
+                                        <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="บ้านเลขที่ หมู่บ้าน ตำบล..." className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">ชื่อคนค้ำประกัน (ถ้ามี)</label>
+                                        <input type="text" value={guarantor} onChange={(e) => setGuarantor(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" />
+                                    </div>
+
+                                    {/* 📸 ส่วนอัปโหลดไฟล์หลักฐานรูปถ่าย 3 ใบ */}
+                                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-3">
+                                        <span className="text-xs font-black text-slate-700 block border-b border-slate-200 pb-1.5"><i className="fa-solid fa-camera mr-1 text-blue-600"></i> ช่องถ่ายภาพ/แนบหลักฐาน</span>
+                                        
+                                        <div>
+                                            <label className="block text-[11px] font-bold text-slate-600 mb-1">1. รูปถ่ายบัตรประชาชนลูกหนี้</label>
+                                            <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setImgCard)} className="w-full text-xs text-slate-500 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-purple-50 file:text-purple-700 file:font-bold" />
+                                            {imgCard && <p className="text-[10px] text-emerald-600 mt-0.5">✓ เลือกรูปภาพบัตรประชาชนแล้ว</p>}
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[11px] font-bold text-slate-600 mb-1">2. รูปถ่ายหน้าตรง "คู่กับบัตรประชาชน"</label>
+                                            <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setImgSelfie)} className="w-full text-xs text-slate-500 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-purple-50 file:text-purple-700 file:font-bold" />
+                                            {imgSelfie && <p className="text-[10px] text-emerald-600 mt-0.5">✓ เลือกรูปถือคู่บัตรประชาชนแล้ว</p>}
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[11px] font-bold text-slate-600 mb-1">3. รูปภาพเอกสารหนังสือสัญญาเงินกู้</label>
+                                            <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setImgContract)} className="w-full text-xs text-slate-500 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-purple-50 file:text-purple-700 file:font-bold" />
+                                            {imgContract && <p className="text-[10px] text-emerald-600 mt-0.5">✓ เลือกรูปภาพเอกสารสัญญากู้แล้ว</p>}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">หมายเหตุบันทึกเพิ่มเติม</label>
+                                        <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" />
+                                    </div>
+
+                                    <div className="flex gap-2 pt-2">
+                                        <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 bg-slate-100 text-slate-500 py-2.5 rounded-xl text-xs font-bold">ยกเลิก</button>
+                                        <button type="submit" className="flex-1 bg-purple-600 text-white py-2.5 rounded-xl text-xs font-bold shadow-md">บันทึกประวัติ</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Modal เปิดดูรูปภาพและเอกสารทั้งหมด */}
+                    {showViewModal && selectedProfile && (
+                        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+                            <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+                                <h3 className="text-base font-black text-slate-800 border-b border-slate-100 pb-2 mb-3">📁 แฟ้มเอกสารหลักฐานสัญญา: {selectedProfile.id}</h3>
+                                
+                                <div className="space-y-4">
+                                    <div>
+                                        <span className="text-xs font-bold text-slate-500 block mb-1">1. รูปภาพหน้าบัตรประชาชน:</span>
+                                        {selectedProfile.imgCard ? (
+                                            <img src={selectedProfile.imgCard} className="w-full h-auto rounded-xl border border-slate-200 max-h-48 object-contain bg-slate-50" alt="ID Card" />
+                                        ) : <div className="text-xs text-slate-400 bg-slate-50 py-4 text-center rounded-xl border border-dashed border-slate-200">❌ ไม่มีข้อมูลรูปบัตรประชาชน</div>}
+                                    </div>
+
+                                    <div>
+                                        <span className="text-xs font-bold text-slate-500 block mb-1">2. รูปหน้าตรงถือบัตรประชาชน:</span>
+                                        {selectedProfile.imgSelfie ? (
+                                            <img src={selectedProfile.imgSelfie} className="w-full h-auto rounded-xl border border-slate-200 max-h-48 object-contain bg-slate-50" alt="Selfie with ID" />
+                                        ) : <div className="text-xs text-slate-400 bg-slate-50 py-4 text-center rounded-xl border border-dashed border-slate-200">❌ ไม่มีข้อมูลรูปถ่ายคู่บัตร</div>}
+                                    </div>
+
+                                    <div>
+                                        <span className="text-xs font-bold text-slate-500 block mb-1">3. รูปภาพใบเอกสารสัญญากู้ยืม:</span>
+                                        {selectedProfile.imgContract ? (
+                                            <img src={selectedProfile.imgContract} className="w-full h-auto rounded-xl border border-slate-200 max-h-48 object-contain bg-slate-50" alt="Contract" />
+                                        ) : <div className="text-xs text-slate-400 bg-slate-50 py-4 text-center rounded-xl border border-dashed border-slate-200">❌ ไม่มีข้อมูลรูปถ่ายใบสัญญา</div>}
+                                    </div>
+                                    
+                                    <div className="bg-slate-50 p-2.5 rounded-xl text-xs text-slate-600 mt-2">
+                                        <strong>หมายเหตุเพิ่มเติม:</strong> {selectedProfile.notes || "-"}
+                                    </div>
+                                </div>
+
+                                <button onClick={() => setShowViewModal(false)} className="w-full mt-4 bg-slate-800 hover:bg-slate-900 text-white py-2.5 rounded-xl text-xs font-bold transition-all">
+                                    ปิดหน้าต่าง
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(/app /);
+        root.render(<App />);
+    </script>
+</body>
+</html>
