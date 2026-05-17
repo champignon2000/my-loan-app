@@ -51,7 +51,6 @@
                 return parseFloat(clean) || 0;
             };
 
-            // ฟังก์ชันช่วยดึงค่าจาก Object โดยไม่สนใจตัวพิมพ์เล็ก-พิมพ์ใหญ่ของคีย์ข้อมูล
             const getValueIgnoreCase = (obj, targetKey, defaultValue = 0) => {
                 if (!obj) return defaultValue;
                 const keys = Object.keys(obj);
@@ -140,7 +139,7 @@
                 setInterestRate(cInterest);
                 setCustomDays(cDays === "-" || !cDays ? 1 : cDays);
                 setCustomCyclePayment(cCycle);
-                setLoanDate(cDate ? cDate.split('T')[0] : new Date().toISOString().split('T')[0]);
+                setLoanDate(cDate ? formatCleanDate(cDate) : new Date().toISOString().split('T')[0]);
                 setShowEditModal(true);
             };
 
@@ -204,11 +203,35 @@
                 setLoanDate(new Date().toISOString().split('T')[0]);
             };
 
+            // 🛠️ ฟังก์ชันจัดฟอร์แมตวันที่ให้ดึงข้อมูลปี-เดือน-วัน ออกมาเช็กได้ตรงกันร้อยเปอร์เซ็นต์
+            const formatCleanDate = (dateString) => {
+                if (!dateString) return "";
+                try {
+                    // รองรับทั้งแบบ ISO String และ Date Object เดิมจาก Sheets
+                    const d = new Date(dateString);
+                    if (isNaN(d.getTime())) {
+                        return dateString.split('T')[0];
+                    }
+                    const year = d.getFullYear();
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                } catch (e) {
+                    return dateString.split('T')[0];
+                }
+            };
+
             const isCreatedToday = (dateString) => {
                 if (!dateString) return false;
-                const todayStr = new Date().toISOString().split('T')[0];
-                const cleanLoanStr = dateString.split('T')[0];
-                return todayStr === cleanLoanStr;
+                
+                // หาวันที่ของระบบเครื่อง Admin ปัจจุบัน (ปี-เดือน-วัน)
+                const today = new Date();
+                const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                
+                // แปลงวันที่ของสัญญามาเทียบ
+                const contractStr = formatCleanDate(dateString);
+                
+                return todayStr === contractStr;
             };
 
             const filtered = customers.filter(c => {
