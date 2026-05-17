@@ -4,13 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ระบบบริหารและติดตามค่างวดลูกหนี้</title>
-    <!-- React & Babel CDN -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Tailwind CSS v4 -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-slate-100 min-h-screen font-sans antialiased text-slate-800">
@@ -41,17 +38,28 @@
             const [loanType, setLoanType] = useState("daily");
             const [principal, setPrincipal] = useState("");
             const [interestRate, setInterestRate] = useState("");
-            const [customDays, setCustomDays] = useState(1); // เปลี่ยนค่าเริ่มต้นเป็น 1 วัน (ส่งทุกวัน)
+            const [customDays, setCustomDays] = useState(1); 
             const [customCyclePayment, setCustomCyclePayment] = useState("");
             const [loanDate, setLoanDate] = useState(new Date().toISOString().split('T')[0]);
 
             useEffect(() => { loadAllData(); }, []);
 
             const parseCleanFloat = (val) => {
-                if (!val) return 0;
+                if (val === undefined || val === null || val === "") return 0;
                 if (typeof val === 'number') return val;
                 const clean = val.toString().replace(/,/g, '').trim();
                 return parseFloat(clean) || 0;
+            };
+
+            // ฟังก์ชันช่วยดึงค่าจาก Object โดยไม่สนใจตัวพิมพ์เล็ก-พิมพ์ใหญ่ของคีย์ข้อมูล
+            const getValueIgnoreCase = (obj, targetKey, defaultValue = 0) => {
+                if (!obj) return defaultValue;
+                const keys = Object.keys(obj);
+                const foundKey = keys.find(k => k.toLowerCase().trim() === targetKey.toLowerCase().trim());
+                if (foundKey && obj[foundKey] !== undefined && obj[foundKey] !== null && obj[foundKey] !== "") {
+                    return obj[foundKey];
+                }
+                return defaultValue;
             };
 
             const loadAllData = async () => {
@@ -116,14 +124,23 @@
             };
 
             const openEditModal = (c) => {
-                setEditId(c.id);
-                setName(c.name);
-                setLoanType(c.loan_type || "daily");
-                setPrincipal(c.principal);
-                setInterestRate(c.interest_rate);
-                setCustomDays(c.days_count === "-" ? 1 : c.days_count);
-                setCustomCyclePayment(c.cycle_payment);
-                setLoanDate(c.loan_date ? c.loan_date.split('T')[0] : new Date().toISOString().split('T')[0]);
+                const cId = getValueIgnoreCase(c, "id", "");
+                const cName = getValueIgnoreCase(c, "name", "");
+                const cType = getValueIgnoreCase(c, "loan_type", "daily");
+                const cPrincipal = getValueIgnoreCase(c, "principal", 0);
+                const cInterest = getValueIgnoreCase(c, "interest_rate", 0);
+                const cDays = getValueIgnoreCase(c, "days_count", 1);
+                const cCycle = getValueIgnoreCase(c, "cycle_payment", 0);
+                const cDate = getValueIgnoreCase(c, "loan_date", "");
+
+                setEditId(cId);
+                setName(cName);
+                setLoanType(cType);
+                setPrincipal(cPrincipal);
+                setInterestRate(cInterest);
+                setCustomDays(cDays === "-" || !cDays ? 1 : cDays);
+                setCustomCyclePayment(cCycle);
+                setLoanDate(cDate ? cDate.split('T')[0] : new Date().toISOString().split('T')[0]);
                 setShowEditModal(true);
             };
 
@@ -195,24 +212,33 @@
             };
 
             const filtered = customers.filter(c => {
+                const cName = getValueIgnoreCase(c, "name", "").toString();
+                const cId = getValueIgnoreCase(c, "id", "").toString();
+                const cStatus = getValueIgnoreCase(c, "status", "ค้างชำระ").toString();
+                const cDate = getValueIgnoreCase(c, "loan_date", "").toString();
+
                 const searchTxt = search.toLowerCase();
-                const matchesSearch = (c.name && c.name.toLowerCase().includes(searchTxt)) || (c.id && c.id.toLowerCase().includes(searchTxt));
+                const matchesSearch = cName.toLowerCase().includes(searchTxt) || cId.toLowerCase().includes(searchTxt);
                 if (!matchesSearch) return false;
                 
                 if (tab === "pending") {
-                    return c.status !== "จ่ายแล้ว" && !isCreatedToday(c.loan_date);
+                    return cStatus !== "จ่ายแล้ว" && !isCreatedToday(cDate);
                 }
-                if (tab === "paid") return c.status === "จ่ายแล้ว";
+                if (tab === "paid") return cStatus === "จ่ายแล้ว";
                 return true;
             });
 
-            const pendingCount = customers.filter(c => c.status !== "จ่ายแล้ว" && !isCreatedToday(c.loan_date)).length;
+            const pendingCount = customers.filter(c => {
+                const cStatus = getValueIgnoreCase(c, "status", "ค้างชำระ").toString();
+                const cDate = getValueIgnoreCase(c, "loan_date", "").toString();
+                return cStatus !== "จ่ายแล้ว" && !isCreatedToday(cDate);
+            }).length;
 
             const summary = customers.reduce((acc, c) => {
-                acc.totalPrincipal += parseCleanFloat(c.principal);
-                acc.totalInterest += parseCleanFloat(c.interest_rate);
-                acc.totalRemaining += parseCleanFloat(c.remaining_balance);
-                acc.totalPaid += parseCleanFloat(c.paid_amount);
+                acc.totalPrincipal += parseCleanFloat(getValueIgnoreCase(c, "principal", 0));
+                acc.totalInterest += parseCleanFloat(getValueIgnoreCase(c, "interest_rate", 0));
+                acc.totalRemaining += parseCleanFloat(getValueIgnoreCase(c, "remaining_balance", 0));
+                acc.totalPaid += parseCleanFloat(getValueIgnoreCase(c, "paid_amount", 0));
                 return acc;
             }, { totalPrincipal: 0, totalInterest: 0, totalRemaining: 0, totalPaid: 0 });
 
@@ -266,7 +292,7 @@
                     <div className="grid grid-cols-3 gap-1 bg-white p-1.5 border-b border-slate-200">
                         <button onClick={() => setTab("all")} className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${tab === 'all' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50'}`}>ทั้งหมด ({customers.length})</button>
                         <button onClick={() => setTab("pending")} className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${tab === 'pending' ? 'bg-amber-50 text-amber-700' : 'text-slate-500 hover:bg-slate-50'}`}>ต้องเก็บวันนี้ ({pendingCount})</button>
-                        <button onClick={() => setTab("paid")} className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${tab === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-500 hover:bg-slate-50'}`}>จ่ายแล้ว ({customers.filter(c => c.status === "จ่ายแล้ว").length})</button>
+                        <button onClick={() => setTab("paid")} className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${tab === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-500 hover:bg-slate-50'}`}>จ่ายแล้ว ({customers.filter(c => getValueIgnoreCase(c, "status", "") === "จ่ายแล้ว").length})</button>
                     </div>
 
                     {/* List */}
@@ -277,24 +303,34 @@
                             <div className="text-center py-20 text-slate-400 text-sm">📭 ไม่พบข้อมูลลูกหนี้ในหมวดหมู่นี้</div>
                         ) : (
                             filtered.map(c => {
-                                const hasProfile = profiles.some(p => p.id === c.id);
-                                const todayContract = isCreatedToday(c.loan_date);
+                                const cId = getValueIgnoreCase(c, "id", "").toString();
+                                const cName = getValueIgnoreCase(c, "name", "").toString();
+                                const cType = getValueIgnoreCase(c, "loan_type", "daily").toString();
+                                const cTotal = getValueIgnoreCase(c, "total_amount", 0);
+                                const cRemaining = getValueIgnoreCase(c, "remaining_balance", 0);
+                                const cDays = getValueIgnoreCase(c, "days_count", 1);
+                                const cCycle = getValueIgnoreCase(c, "cycle_payment", 0);
+                                const cStatus = getValueIgnoreCase(c, "status", "ค้างชำระ").toString();
+                                const cDate = getValueIgnoreCase(c, "loan_date", "").toString();
+
+                                const hasProfile = profiles.some(p => getValueIgnoreCase(p, "id", "").toString() === cId);
+                                const todayContract = isCreatedToday(cDate);
                                 return (
-                                    <div key={c.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs relative overflow-hidden">
+                                    <div key={cId} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs relative overflow-hidden">
                                         <div className="flex justify-between items-start mb-2">
                                             <div>
-                                                <h4 className="font-black text-slate-800 text-base">{c.name}</h4>
-                                                <span className="text-[11px] text-slate-400 font-mono block">ID: {c.id}</span>
+                                                <h4 className="font-black text-slate-800 text-base">{cName}</h4>
+                                                <span className="text-[11px] text-slate-400 font-mono block">ID: {cId}</span>
                                             </div>
                                             <div className="flex items-center gap-1.5">
                                                 <button onClick={() => openEditModal(c)} className="text-amber-600 hover:text-amber-700 p-1.5 text-xs bg-amber-50 rounded-lg border border-amber-100 transition-all cursor-pointer">
                                                     <i className="fa-solid fa-pen-to-square"></i>
                                                 </button>
-                                                <button onClick={() => handleDeleteCustomer(c.id, c.name)} className="text-rose-500 hover:text-rose-700 p-1.5 text-xs bg-rose-50 rounded-lg border border-rose-100 transition-all cursor-pointer">
+                                                <button onClick={() => handleDeleteCustomer(cId, cName)} className="text-rose-500 hover:text-rose-700 p-1.5 text-xs bg-rose-50 rounded-lg border border-rose-100 transition-all cursor-pointer">
                                                     <i className="fa-solid fa-trash-can"></i>
                                                 </button>
-                                                <span className={`text-[11px] font-black px-2.5 py-1 rounded-full ${c.status === "จ่ายแล้ว" ? "bg-emerald-100 text-emerald-700" : todayContract ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
-                                                    {c.status === "จ่ายแล้ว" ? "จ่ายแล้ว" : todayContract ? "เริ่มงวดถัดไป" : "ค้างชำระ"}
+                                                <span className={`text-[11px] font-black px-2.5 py-1 rounded-full ${cStatus === "จ่ายแล้ว" ? "bg-emerald-100 text-emerald-700" : todayContract ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
+                                                    {cStatus === "จ่ายแล้ว" ? "จ่ายแล้ว" : todayContract ? "เริ่มงวดถัดไป" : "ค้างชำระ"}
                                                 </span>
                                             </div>
                                         </div>
@@ -311,15 +347,15 @@
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-y-1.5 text-xs text-slate-600 border-t border-slate-100 pt-2.5 mb-3">
-                                            <div>ยอดรวมสัญญา: <strong className="text-slate-900">{parseCleanFloat(c.total_amount).toLocaleString()} บ.</strong></div>
-                                            <div>ยอดค้างชำระ: <strong className="text-rose-600">{parseCleanFloat(c.remaining_balance).toLocaleString()} บ.</strong></div>
-                                            <div>รอบส่งงาน: <span className="text-indigo-600 font-bold">ทุก ๆ {c.days_count || "1"} วัน</span></div>
-                                            <div>ยอดจัดเก็บต่อรอบ: <span className="text-emerald-600 font-black">{parseCleanFloat(c.cycle_payment).toLocaleString()} บ.</span></div>
-                                            <div className="col-span-2 text-slate-400 text-[11px]">ประเภทสัญญากู้: {c.loan_type === "float" ? "ดอกลอย" : "รายวัน (ตัดต้นตัดดอก)"}</div>
+                                            <div>ยอดรวมสัญญา: <strong className="text-slate-900">{parseCleanFloat(cTotal).toLocaleString()} บ.</strong></div>
+                                            <div>ยอดค้างชำระ: <strong className="text-rose-600">{parseCleanFloat(cRemaining).toLocaleString()} บ.</strong></div>
+                                            <div>รอบส่งงาน: <span className="text-indigo-600 font-bold">ทุก ๆ {cDays || "1"} วัน</span></div>
+                                            <div>ยอดจัดเก็บต่อรอบ: <span className="text-emerald-600 font-black">{parseCleanFloat(cCycle).toLocaleString()} บ.</span></div>
+                                            <div className="col-span-2 text-slate-400 text-[11px]">ประเภทสัญญากู้: {cType === "float" ? "ดอกลอย" : "รายวัน (ตัดต้นตัดดอก)"}</div>
                                         </div>
 
-                                        {c.status !== "จ่ายแล้ว" && (
-                                            <button onClick={() => { setSelectedUser(c); setPayAmount(c.cycle_payment); setShowPayModal(true); }} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl text-xs shadow-xs transition-all cursor-pointer">
+                                        {cStatus !== "จ่ายแล้ว" && (
+                                            <button onClick={() => { setSelectedUser({id: cId, name: cName, cycle_payment: cCycle}); setPayAmount(cCycle); setShowPayModal(true); }} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl text-xs shadow-xs transition-all cursor-pointer">
                                                 🪙 บันทึกการรับชำระเงินงวดนี้
                                             </button>
                                         )}
