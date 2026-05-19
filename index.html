@@ -252,7 +252,7 @@
                 return cStatus !== "จ่ายแล้ว" && isDueToday(cDate, cDays);
             }).length;
 
-            // 🛠️ แก้ไขการสแกนหาคำระบุคอลัมน์ของ Dashboard ให้แม่นยำขึ้นตรงจุดนี้
+            // 🛠️ แก้ไขการเจาะจงชื่อหัวตาราง Dashboard ให้แมตช์แม่นยำ 100% ไม่ดึงสลับช่อง
             const summary = customers.reduce((acc, c) => {
                 acc.totalPrincipal += parseCleanFloat(getValueIgnoreCase(c, "principal", 0));
                 acc.totalInterest += parseCleanFloat(getValueIgnoreCase(c, "interest_rate", 0));
@@ -326,8 +326,8 @@
                                 const cName = getValueIgnoreCase(c, "name", "").toString();
                                 const cType = getValueIgnoreCase(c, "loantype", "daily").toString();
                                 const cTotal = getValueIgnoreCase(c, "total_amount", 0);
-                                const cPaid = getValueIgnoreCase(c, "paid_amount", 0); // 🛠️ เพิ่มจุดนี้ดึงค่าจาก paid_amount
-                                const cRemaining = getValueIgnoreCase(c, "remaining_balance", 0); // 🛠️ ปรับให้ตรงคอลัมน์ตรง ๆ
+                                const cPaid = getValueIgnoreCase(c, "paid_amount", 0); // 🛠️ บังคับดึงค่าจากคอลัมน์ชำระแล้วตรง ๆ
+                                const cRemaining = getValueIgnoreCase(c, "remaining_balance", 0); // 🛠️ บังคับดึงค่าจากคอลัมน์คงเหลือตรง ๆ
                                 const cDays = getValueIgnoreCase(c, "days_count", 1);
                                 const cCycle = getValueIgnoreCase(c, "cycle_payment", 0);
                                 const cStatus = getValueIgnoreCase(c, "status", "ค้างชำระ").toString();
@@ -365,7 +365,7 @@
                                             )}
                                         </div>
 
-                                        {/* 🛠️ เพิ่มบรรทัดแสดงผล "ยอดที่ชำระแล้ว:" เข้าไปในระบบ */}
+                                        {/* 🛠️ เพิ่ม UI แสดงผลคอลัมน์ ยอดที่ชำระแล้ว เข้าไปในหน้ารายชื่อรายคน */}
                                         <div className="grid grid-cols-2 gap-y-1.5 text-xs text-slate-600 border-t border-slate-100 pt-2.5 mb-3">
                                             <div>ยอดรวมสัญญา: <strong className="text-slate-900">{parseCleanFloat(cTotal).toLocaleString()} บ.</strong></div>
                                             <div>ยอดที่ชำระแล้ว: <strong className="text-emerald-600">{parseCleanFloat(cPaid).toLocaleString()} บ.</strong></div>
