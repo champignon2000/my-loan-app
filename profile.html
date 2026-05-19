@@ -16,7 +16,7 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // ⚠️ อย่าลืมใส่ลิงก์ Web App URL ของคุณที่นี่
+        // ⚠️ อย่าลืมใส่ลิงก์ Web App URL (Apps Script) ของคุณที่นี่
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzzLq_tmiOUFVyxcPfIeRiOnm0zWhhGIpsvCn0sR4Q2GJrifIipU4oELWjVeXkxXMA_/exec";
 
         function App() {
@@ -50,7 +50,7 @@
                     setCustomers(Array.isArray(dataCust) ? dataCust : []);
                 } catch (err) { 
                     console.error(err); 
-                } Jack: finally {
+                } finally {
                     setLoading(false);
                 }
             };
@@ -75,7 +75,7 @@
             };
 
             const handleCloseFloatLoan = async (cust) => {
-                if (!confirm(`🚨 ยืนยันการ "ปิดยอดเงินต้นถาวร" ของคุณ ${cust.name}?\nระบบจะตัดยอดค้างใน Google Sheets เป็น 0 และเคลียร์สัญญานี้ทันที`)) return;
+                if (!confirm(`🚨 ยืนยันการ "ปิดยอดเงินต้นถาวร" ของคุณ ${cust.name}?\nระบบจะตัดยอดค้างใน Google Sheets เป็น 0 และจบสัญญานี้ทันที`)) return;
                 try {
                     await fetch(SCRIPT_URL, {
                         method: "POST",
@@ -132,7 +132,9 @@
                             filtered.map(c => {
                                 const cId = getValueFromSheet(c, "id").toString();
                                 const cName = getValueFromSheet(c, "name").toString();
-                                const cType = getValueFromSheet(c, "loanType").toString().trim(); // ดึงคอลัมน์ loanType ตรงๆ
+                                
+                                // 🔒 แปลงคำให้เป็นตัวพิมพ์เล็กและลบช่องว่างทิ้งทั้งหมด ป้องกันคำว่า float เพี้ยน
+                                const rawType = getValueFromSheet(c, "loanType").toString().toLowerCase().replace(/\s+/g, '');
                                 
                                 const cTotalAmount = getValueFromSheet(c, "total_amount", 0);
                                 const cRemainingBalance = getValueFromSheet(c, "remaining_balance", 0); 
@@ -141,7 +143,7 @@
                                 const cPaidAmount = getValueFromSheet(c, "paid_amount", 0);
 
                                 const isPaid = checkIfPaidSuccess(c);
-                                const isFloat = cType === "float" || cType === "ดอกลอย";
+                                const isFloat = rawType === "float"; // แมปคำว่า float ตัวพิมพ์เล็กตรงๆ จากคอลัมน์ C
 
                                 return (
                                     <div key={cId} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
@@ -164,22 +166,22 @@
                                             <div className="col-span-2 text-slate-500 font-bold text-[11px]">ประเภท: {isFloat ? "ดอกลอย" : "รายวัน"}</div>
                                         </div>
 
-                                        {/* พื้นที่กลุ่มปุ่มกดสำหรับสัญญาที่ยังไม่ปิด */}
-                                        {!isPaid && (
-                                            <div className="flex flex-col gap-2 mt-2">
-                                                {/* ปุ่มส่งค่างวด/ส่งดอกเบี้ยรายรอบปกติ */}
+                                        {/* พื้นที่แสดงปุ่มกด */}
+                                        <div className="flex flex-col gap-2 mt-2">
+                                            {/* ปุ่มส่งเงินปกติ (ให้กดได้ถ้าสถานะในชีตไม่ได้พิมพ์ว่า จ่ายแล้ว) */}
+                                            {!isPaid && (
                                                 <button onClick={() => { setSelectedUser({id: cId, name: cName}); setPayAmount(cCyclePayment); setShowPayModal(true); }} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs transition-all cursor-pointer">
                                                     🪙 {isFloat ? "บันทึกการส่งดอกรอบนี้" : "บันทึกการชำระค่างวด"}
                                                 </button>
-                                                
-                                                {/* 🚨 ปุ่มปิดยอดเงินต้นถาวร บังคับแสดงผลขึ้นมาแน่นอนสำหรับประเภทดอกลอย (float) */}
-                                                {isFloat && (
-                                                    <button onClick={() => handleCloseFloatLoan(c)} className="w-full bg-red-600 hover:bg-red-700 text-white font-black py-3 rounded-xl text-xs shadow-md transition-all cursor-pointer border border-red-700 block text-center">
-                                                        🚨 ปิดยอดเงินต้นถาวร (จบสัญญา)
-                                                    </button>
-                                                )}
-                                            </div>
-                                        )}
+                                            )}
+                                            
+                                            {/* 🚨 ปุ่มปิดยอดเงินต้นถาวร: ปลดล็อกเงื่อนไขซับซ้อนออกทั้งหมด ตราบใดที่เป็นสัญญากลุ่ม float ปุ่มนี้จะขึ้นค้างไว้ให้กดเสมอไม่มีโดนซ่อนครับ */}
+                                            {isFloat && (
+                                                <button onClick={() => handleCloseFloatLoan(c)} className="w-full bg-red-600 hover:bg-red-700 text-white font-black py-3 rounded-xl text-xs shadow-md transition-all cursor-pointer border border-red-700 block text-center">
+                                                    🚨 ปิดยอดเงินต้นถาวร (จบสัญญา)
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 );
                             })
