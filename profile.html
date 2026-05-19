@@ -51,14 +51,16 @@
                 return parseFloat(clean) || 0;
             };
 
-            const getValueIgnoreCase = (obj, targetKey, defaultValue = 0) => {
+            // ฟังก์ชันดึงค่าจากออบเจกต์โดยเช็กความใกล้เคียงของชื่อคอลัมน์ใน Google Sheets
+            const getValueFromSheet = (obj, targetKey, defaultValue = 0) => {
                 if (!obj) return defaultValue;
                 const keys = Object.keys(obj);
-                const cleanTarget = targetKey.toLowerCase().replace(/[^a-z0-9]/g, '');
                 
+                // ค้นหาคีย์ที่สะกดตรงหรือใกล้เคียงที่สุด (ไม่สนใจตัวเล็กใหญ่/ขีดล่าง)
+                const cleanTarget = targetKey.toLowerCase().replace(/[^a-z0-9]/g, '');
                 const foundKey = keys.find(k => {
                     const cleanKey = k.toLowerCase().replace(/[^a-z0-9]/g, '');
-                    return cleanKey.includes(cleanTarget) || cleanTarget.includes(cleanKey);
+                    return cleanKey === cleanTarget || cleanKey.includes(cleanTarget) || cleanTarget.includes(cleanKey);
                 });
 
                 if (foundKey && obj[foundKey] !== undefined && obj[foundKey] !== null && obj[foundKey] !== "") {
@@ -129,14 +131,14 @@
             };
 
             const openEditModal = (c) => {
-                const cId = getValueIgnoreCase(c, "id", "").toString();
-                const cName = getValueIgnoreCase(c, "name", "").toString();
-                const cType = getValueIgnoreCase(c, "loantype", "daily").toString();
-                const cPrincipal = getValueIgnoreCase(c, "principal", 0);
-                const cInterest = getValueIgnoreCase(c, "interest", 0);
-                const cDays = getValueIgnoreCase(c, "days", 1);
-                const cCycle = getValueIgnoreCase(c, "cycle", 0);
-                const cDate = getValueIgnoreCase(c, "date", "");
+                const cId = getValueFromSheet(c, "id", "").toString();
+                const cName = getValueFromSheet(c, "name", "").toString();
+                const cType = getValueFromSheet(c, "loanType", "daily").toString();
+                const cPrincipal = getValueFromSheet(c, "principal", 0);
+                const cInterest = getValueFromSheet(c, "interest_rate", 0);
+                const cDays = getValueFromSheet(c, "days_count", 1);
+                const cCycle = getValueFromSheet(c, "cycle_payment", 0);
+                const cDate = getValueFromSheet(c, "loan_date", "");
 
                 setEditId(cId);
                 setName(cName);
@@ -248,26 +250,23 @@
                 return todayStr === contractStr;
             };
 
-            // ฟังก์ชันส่วนกลางเช็กว่า "จ่ายจบสัญญาหรือยัง" เพื่อให้เงื่อนไขแท็บตรงกันทั้งหมด
             const checkIfPaidSuccess = (c) => {
-                const cType = getValueIgnoreCase(c, "loantype", "daily").toString();
-                const cStatus = getValueIgnoreCase(c, "status", "ค้างชำระ").toString();
-                const cRemaining = parseCleanFloat(getValueIgnoreCase(c, "balan", 0));
+                const cType = getValueFromSheet(c, "loanType", "daily").toString();
+                const cStatus = getValueFromSheet(c, "status", "ค้างชำระ").toString();
+                const cRemaining = parseCleanFloat(getValueFromSheet(c, "remaining_balan", 0));
 
                 if (cType === "float") {
-                    // 🔥 ดอกลอย: จะถือว่าจ่ายแล้วเมื่อ ยอดค้างชำระ (ต้น) เป็น 0 เท่านั้น!
                     return cRemaining <= 0;
                 } else {
-                    // รายวัน: ใช้ตามสถานะชีตเดิมหรือยอดเหลือเป็น 0
                     return cStatus === "จ่ายแล้ว" || cRemaining <= 0;
                 }
             };
 
             const filtered = customers.filter(c => {
-                const cName = getValueIgnoreCase(c, "name", "").toString();
-                const cId = getValueIgnoreCase(c, "id", "").toString();
-                const cDate = getValueIgnoreCase(c, "date", "").toString();
-                const cDays = getValueIgnoreCase(c, "days", 1);
+                const cName = getValueFromSheet(c, "name", "").toString();
+                const cId = getValueFromSheet(c, "id", "").toString();
+                const cDate = getValueFromSheet(c, "loan_date", "").toString();
+                const cDays = getValueFromSheet(c, "days_count", 1);
 
                 const searchTxt = search.toLowerCase();
                 const matchesSearch = cName.toLowerCase().includes(searchTxt) || cId.toLowerCase().includes(searchTxt);
@@ -281,12 +280,12 @@
                 if (tab === "paid") {
                     return isPaid;
                 }
-                return true; // แท็บ ทั้งหมด
+                return true; 
             });
 
             const pendingCount = customers.filter(c => {
-                const cDate = getValueIgnoreCase(c, "date", "").toString();
-                const cDays = getValueIgnoreCase(c, "days", 1);
+                const cDate = getValueFromSheet(c, "loan_date", "").toString();
+                const cDays = getValueFromSheet(c, "days_count", 1);
                 const isPaid = checkIfPaidSuccess(c);
                 return !isPaid && isDueToday(cDate, cDays);
             }).length;
@@ -294,10 +293,10 @@
             const paidCount = customers.filter(c => checkIfPaidSuccess(c)).length;
 
             const summary = customers.reduce((acc, c) => {
-                acc.totalPrincipal += parseCleanFloat(getValueIgnoreCase(c, "principal", 0));
-                acc.totalInterest += parseCleanFloat(getValueIgnoreCase(c, "interest", 0));
-                acc.totalRemaining += parseCleanFloat(getValueIgnoreCase(c, "balan", 0)); 
-                acc.totalPaid += parseCleanFloat(getValueIgnoreCase(c, "paid", 0));
+                acc.totalPrincipal += parseCleanFloat(getValueFromSheet(c, "principal", 0));
+                acc.totalInterest += parseCleanFloat(getValueFromSheet(c, "interest_rate", 0));
+                acc.totalRemaining += parseCleanFloat(getValueFromSheet(c, "remaining_balan", 0)); 
+                acc.totalPaid += parseCleanFloat(getValueFromSheet(c, "paid_amount", 0));
                 return acc;
             }, { totalPrincipal: 0, totalInterest: 0, totalRemaining: 0, totalPaid: 0 });
 
@@ -362,16 +361,16 @@
                             <div className="text-center py-20 text-slate-400 text-sm">📭 ไม่พบข้อมูลลูกหนี้ในหมวดหมู่นี้</div>
                         ) : (
                             filtered.map(c => {
-                                const cId = getValueIgnoreCase(c, "id", "").toString();
-                                const cName = getValueIgnoreCase(c, "name", "").toString();
-                                const cType = getValueIgnoreCase(c, "loantype", "daily").toString(); 
-                                const cTotal = getValueIgnoreCase(c, "total", 0);
-                                const cRemaining = getValueIgnoreCase(c, "balan", 0); 
-                                const cDays = getValueIgnoreCase(c, "days", 1);
-                                const cCycle = getValueIgnoreCase(c, "cycle", 0);
-                                const cDate = getValueIgnoreCase(c, "date", "").toString();
+                                const cId = getValueFromSheet(c, "id", "").toString();
+                                const cName = getValueFromSheet(c, "name", "").toString();
+                                const cType = getValueFromSheet(c, "loanType", "daily").toString(); 
+                                const cTotal = getValueFromSheet(c, "total_amount", 0);
+                                const cRemaining = getValueFromSheet(c, "remaining_balan", 0); 
+                                const cDays = getValueFromSheet(c, "days_count", 1); 
+                                const cCycle = getValueFromSheet(c, "cycle_payment", 0); 
+                                const cDate = getValueFromSheet(c, "loan_date", "").toString();
 
-                                const hasProfile = profiles.some(p => getValueIgnoreCase(p, "id", "").toString() === cId);
+                                const hasProfile = profiles.some(p => getValueFromSheet(p, "id", "").toString() === cId);
                                 const todayContract = isCreatedToday(cDate);
                                 const isPaid = checkIfPaidSuccess(c);
 
