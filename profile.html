@@ -16,8 +16,8 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // ⚠️ อย่าลืมระบุ Web App URL ของคุณที่นี่
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby-ao2jGyIkI3xbmhZWwbjXiJFC3XM0Ed58c6lh_AEb-NwJhRiyLLrqSmpB6h_YsweS/exec";
+        // ⚠️ อย่าลืมใส่ลิงก์ Web App URL ของคุณที่นี่
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzzLq_tmiOUFVyxcPfIeRiOnm0zWhhGIpsvCn0sR4Q2GJrifIipU4oELWjVeXkxXMA_/exec";
 
         function App() {
             const [customers, setCustomers] = useState([]);
@@ -34,16 +34,12 @@
             const parseCleanFloat = (val) => {
                 if (val === undefined || val === null || val === "") return 0;
                 if (typeof val === 'number') return val;
-                const clean = val.toString().replace(/,/g, '').trim();
-                return parseFloat(clean) || 0;
+                return parseFloat(val.toString().replace(/,/g, '').trim()) || 0;
             };
 
             const getValueFromSheet = (obj, targetKey, defaultValue = "") => {
                 if (!obj) return defaultValue;
-                if (obj[targetKey] !== undefined && obj[targetKey] !== null) {
-                    return obj[targetKey];
-                }
-                return defaultValue;
+                return obj[targetKey] !== undefined && obj[targetKey] !== null ? obj[targetKey] : defaultValue;
             };
 
             const loadAllData = async () => {
@@ -54,7 +50,7 @@
                     setCustomers(Array.isArray(dataCust) ? dataCust : []);
                 } catch (err) { 
                     console.error(err); 
-                } finally {
+                } Jack: finally {
                     setLoading(false);
                 }
             };
@@ -62,7 +58,7 @@
             const handlePayment = async (e) => {
                 e.preventDefault();
                 if (!payAmount || parseFloat(payAmount) <= 0) return;
-                if (!confirm(`🪙 ยืนยันบันทึกยอดส่งดอกเบี้ย/ค่างวดจำนวน ${parseFloat(payAmount).toLocaleString()} บาท?`)) return;
+                if (!confirm(`🪙 ยืนยันบันทึกยอดชำระจำนวน ${parseFloat(payAmount).toLocaleString()} บาท?`)) return;
                 
                 setShowPayModal(false);
                 try {
@@ -78,9 +74,8 @@
                 } catch(err) { console.error(err); }
             };
 
-            // ฟังก์ชันยิงคำสั่งไปเคลียร์สัญญากู้ดอกลอยให้เป็น 0 (ปิดสัญญา)
             const handleCloseFloatLoan = async (cust) => {
-                if (!confirm(`🚨 ยืนยันการ "ปิดยอดเงินต้นถาวร" ของคุณ ${cust.name}?\nระบบจะเคลียร์ยอดค้างชำระใน Google Sheets เป็น 0 และจบสัญญานี้ทันที`)) return;
+                if (!confirm(`🚨 ยืนยันการ "ปิดยอดเงินต้นถาวร" ของคุณ ${cust.name}?\nระบบจะตัดยอดค้างใน Google Sheets เป็น 0 และเคลียร์สัญญานี้ทันที`)) return;
                 try {
                     await fetch(SCRIPT_URL, {
                         method: "POST",
@@ -93,10 +88,8 @@
                 } catch(err) { console.error(err); }
             };
 
-            // ตรวจสอบสถานะ: เชื่อจากข้อความในช่อง status ของ Google Sheets เท่านั้น ไม่คำนวณเลขอัตโนมัติเอง
             const checkIfPaidSuccess = (c) => {
-                const cStatus = getValueFromSheet(c, "status", "ค้างชำระ").toString().trim();
-                return cStatus === "จ่ายแล้ว";
+                return getValueFromSheet(c, "status", "ค้างชำระ").toString().trim() === "จ่ายแล้ว";
             };
 
             const filtered = customers.filter(c => {
@@ -129,19 +122,18 @@
                         <button onClick={() => setTab("paid")} className={`py-2 text-xs font-bold rounded-lg cursor-pointer ${tab === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-500'}`}>จ่ายแล้ว ({customers.filter(c=>checkIfPaidSuccess(c)).length})</button>
                     </div>
 
-                    {/* รายชื่อการ์ดลูกหนี้ */}
+                    {/* การ์ดรายชื่อลูกหนี้ */}
                     <div className="flex-1 p-3 space-y-3 overflow-y-auto">
                         {loading ? (
-                            <div className="text-center py-20 text-slate-400"><i className="fa-solid fa-circle-notch fa-spin text-2xl text-indigo-600 mb-2"></i><p className="text-xs">กำลังดึงข้อมูลจากตาราง...</p></div>
+                            <div className="text-center py-20 text-slate-400"><i className="fa-solid fa-circle-notch fa-spin text-2xl text-indigo-600 mb-2"></i><p className="text-xs">กำลังดึงข้อมูล...</p></div>
                         ) : filtered.length === 0 ? (
                             <div className="text-center py-20 text-slate-400 text-sm">📭 ไม่พบข้อมูลข้อมูล</div>
                         ) : (
                             filtered.map(c => {
                                 const cId = getValueFromSheet(c, "id").toString();
                                 const cName = getValueFromSheet(c, "name").toString();
+                                const cType = getValueFromSheet(c, "loanType").toString().trim(); // ดึงคอลัมน์ loanType ตรงๆ
                                 
-                                // 🎯 ดึงแมปปิ้งข้อมูลตรงล็อกตามหัวข้อในตารางกูเกิ้ลชีตของคุณเป๊ะ ๆ
-                                const cType = getValueFromSheet(c, "loanType").toString().trim();
                                 const cTotalAmount = getValueFromSheet(c, "total_amount", 0);
                                 const cRemainingBalance = getValueFromSheet(c, "remaining_balance", 0); 
                                 const cDaysCount = getValueFromSheet(c, "days_count", 0); 
@@ -163,39 +155,38 @@
                                             </span>
                                         </div>
 
-                                        {/* ข้อมูลดิบจากชีต */}
                                         <div className="grid grid-cols-2 gap-y-1.5 text-xs text-slate-600 border-t border-slate-100 pt-2.5 mb-3">
                                             <div>ยอดรวมสัญญา: <strong className="text-slate-900">{parseCleanFloat(cTotalAmount).toLocaleString()} บ.</strong></div>
                                             <div>ยอดค้างชำระ: <strong className="text-rose-600">{parseCleanFloat(cRemainingBalance).toLocaleString()} บ.</strong></div>
                                             <div>รอบส่งงาน: <span className="text-indigo-600 font-bold">ทุก ๆ {cDaysCount} วัน</span></div>
                                             <div>ยอดจัดเก็บต่อรอบ: <span className="text-emerald-600 font-black">{parseCleanFloat(cCyclePayment).toLocaleString()} บ.</span></div>
                                             <div className="col-span-2 text-slate-400 text-[11px]">ยอดส่งสะสมแล้ว: <span className="text-blue-600 font-bold">{parseCleanFloat(cPaidAmount).toLocaleString()} บ.</span></div>
-                                            <div className="col-span-2 text-slate-500 font-bold text-[11px]">ประเภทสัญญา: {isFloat ? "ดอกลอย (ส่งเฉพาะดอกเบี้ย)" : "รายวัน (หักต้นหักดอก)"}</div>
+                                            <div className="col-span-2 text-slate-500 font-bold text-[11px]">ประเภท: {isFloat ? "ดอกลอย" : "รายวัน"}</div>
                                         </div>
 
-                                        {/* พื้นที่แสดงแอ็กชันปุ่มกด */}
-                                        <div className="flex flex-col gap-2">
-                                            {/* ปุ่มที่ 1: บันทึกรับเงินงวด/รับดอกเบี้ยปกติ (สามารถกดส่งได้เรื่อย ๆ ตราบใดที่สถานะในชีตยังไม่สั่งว่า จ่ายแล้ว) */}
-                                            {!isPaid && (
+                                        {/* พื้นที่กลุ่มปุ่มกดสำหรับสัญญาที่ยังไม่ปิด */}
+                                        {!isPaid && (
+                                            <div className="flex flex-col gap-2 mt-2">
+                                                {/* ปุ่มส่งค่างวด/ส่งดอกเบี้ยรายรอบปกติ */}
                                                 <button onClick={() => { setSelectedUser({id: cId, name: cName}); setPayAmount(cCyclePayment); setShowPayModal(true); }} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs transition-all cursor-pointer">
                                                     🪙 {isFloat ? "บันทึกการส่งดอกรอบนี้" : "บันทึกการชำระค่างวด"}
                                                 </button>
-                                            )}
-                                            
-                                            {/* 🚨 ปุ่มปิดยอดเงินต้นถาวร (สำหรับสัญญาดอกลอย): จะถูกบังคับให้แสดงผลหราค้างไว้ตลอดจนกว่าคุณจะกดมัน เพื่อส่งคำสั่งไปปิดสัญญานี้อย่างสมบูรณ์ */}
-                                            {isFloat && !isPaid && (
-                                                <button onClick={() => handleCloseFloatLoan(c)} className="w-full bg-linear-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white font-black py-3 rounded-xl text-xs shadow-md transition-all cursor-pointer border border-red-700 block text-center">
-                                                    🚨 ลูกหนี้นำเงินก้อนมา "ปิดยอดเงินต้นถาวร"
-                                                </button>
-                                            )}
-                                        </div>
+                                                
+                                                {/* 🚨 ปุ่มปิดยอดเงินต้นถาวร บังคับแสดงผลขึ้นมาแน่นอนสำหรับประเภทดอกลอย (float) */}
+                                                {isFloat && (
+                                                    <button onClick={() => handleCloseFloatLoan(c)} className="w-full bg-red-600 hover:bg-red-700 text-white font-black py-3 rounded-xl text-xs shadow-md transition-all cursor-pointer border border-red-700 block text-center">
+                                                        🚨 ปิดยอดเงินต้นถาวร (จบสัญญา)
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })
                         )}
                     </div>
 
-                    {/* Modal ป๊อปอัพกรอกตัวเลขค่างวด */}
+                    {/* Modal */}
                     {showPayModal && selectedUser && (
                         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
                             <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl">
@@ -207,7 +198,7 @@
                                     </div>
                                     <div className="flex gap-2">
                                         <button type="button" onClick={() => setShowPayModal(false)} className="flex-1 bg-slate-100 text-slate-500 py-2.5 rounded-xl text-xs font-bold cursor-pointer">ยกเลิก</button>
-                                        <button type="submit" className="flex-1 bg-indigo-600 text-white py-2.5 rounded-xl text-xs font-bold cursor-pointer">ยืนยันรับยอด</button>
+                                        <button type="submit" className="flex-1 bg-indigo-600 text-white py-2.5 rounded-xl text-xs font-bold cursor-pointer">ยืนยัน</button>
                                     </div>
                                 </form>
                             </div>
