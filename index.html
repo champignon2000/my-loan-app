@@ -16,7 +16,7 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // ⚠️ ใส่ลิงก์ Web App URL (Apps Script) ของคุณที่นี่
+        // ⚠️ อย่าลืมใส่ลิงก์ Web App URL (Apps Script) ของคุณที่นี่ครับ
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzzLq_tmiOUFVyxcPfIeRiOnm0zWhhGIpsvCn0sR4Q2GJrifIipU4oELWjVeXkxXMA_/exec";
 
         function App() {
@@ -37,16 +37,9 @@
                 return parseFloat(val.toString().replace(/,/g, '').trim()) || 0;
             };
 
-            // ระบบดึงค่าแบบยืดหยุ่นสูง ป้องกันการสะกดคีย์สลับพิมพ์เล็ก-ใหญ่ หรือ snake_case
-            const getFlexibleValue = (obj, key) => {
-                if (!obj) return "";
-                const target = key.toLowerCase().replace(/[^a-z0-9]/g, "");
-                for (let actualKey in obj) {
-                    if (actualKey.toLowerCase().replace(/[^a-z0-9]/g, "") === target) {
-                        return obj[actualKey];
-                    }
-                }
-                return "";
+            const getValueFromSheet = (obj, targetKey, defaultValue = "") => {
+                if (!obj) return defaultValue;
+                return obj[targetKey] !== undefined && obj[targetKey] !== null ? obj[targetKey] : defaultValue;
             };
 
             const loadAllData = async () => {
@@ -96,12 +89,12 @@
             };
 
             const checkIfPaidSuccess = (c) => {
-                return getFlexibleValue(c, "status").toString().trim() === "จ่ายแล้ว";
+                return getValueFromSheet(c, "status", "ค้างชำระ").toString().trim() === "จ่ายแล้ว";
             };
 
             const filtered = customers.filter(c => {
-                const cName = getFlexibleValue(c, "name").toString();
-                const cId = getFlexibleValue(c, "id").toString();
+                const cName = getValueFromSheet(c, "name", "").toString();
+                const cId = getValueFromSheet(c, "id", "").toString();
                 const matchesSearch = cName.toLowerCase().includes(search.toLowerCase()) || cId.toLowerCase().includes(search.toLowerCase());
                 if (!matchesSearch) return false;
                 
@@ -137,18 +130,19 @@
                             <div className="text-center py-20 text-slate-400 text-sm">📭 ไม่พบข้อมูลข้อมูล</div>
                         ) : (
                             filtered.map(c => {
-                                const cId = getFlexibleValue(c, "id").toString();
-                                const cName = getFlexibleValue(c, "name").toString();
+                                const cId = getValueFromSheet(c, "id").toString();
+                                const cName = getValueFromSheet(c, "name").toString();
+                                const cType = getValueFromSheet(c, "loanType").toString().trim(); 
                                 
-                                const rawType = getFlexibleValue(c, "loanType").toString().toLowerCase().replace(/\s+/g, '');
-                                const cTotalAmount = getFlexibleValue(c, "totalAmount") || getFlexibleValue(c, "total_amount") || 0;
-                                const cRemainingBalance = getFlexibleValue(c, "remainingBalance") || getFlexibleValue(c, "remaining_balance") || 0; 
-                                const cDaysCount = getFlexibleValue(c, "daysCount") || getFlexibleValue(c, "days_count") || 0; 
-                                const cCyclePayment = getFlexibleValue(c, "cyclePayment") || getFlexibleValue(c, "cycle_payment") || 0; 
-                                const cPaidAmount = getFlexibleValue(c, "paidAmount") || getFlexibleValue(c, "paid_amount") || 0;
+                                // 🎯 ดึงชื่อคีย์ตรงตามหัวข้อ Google Sheets แถวที่ 1 เป๊ะ ๆ ยอดกลับมาแน่นอนครับ
+                                const cTotalAmount = getValueFromSheet(c, "total_amount", 0);
+                                const cRemainingBalance = getValueFromSheet(c, "remaining_balance", 0); 
+                                const cDaysCount = getValueFromSheet(c, "days_count", 0); 
+                                const cCyclePayment = getValueFromSheet(c, "cycle_payment", 0); 
+                                const cPaidAmount = getValueFromSheet(c, "paid_amount", 0);
 
                                 const isPaid = checkIfPaidSuccess(c);
-                                const isFloat = rawType === "float"; 
+                                const isFloat = cType === "float"; 
 
                                 return (
                                     <div key={cId} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
@@ -162,6 +156,7 @@
                                             </span>
                                         </div>
 
+                                        {/* ยอดเงินและรายละเอียดสัญญากลับมาแสดงผลแบบถูกต้องครบถ้วนแล้วครับ */}
                                         <div className="grid grid-cols-2 gap-y-1.5 text-xs text-slate-600 border-t border-slate-100 pt-2.5 mb-3">
                                             <div>ยอดรวมสัญญา: <strong className="text-slate-900">{parseCleanFloat(cTotalAmount).toLocaleString()} บ.</strong></div>
                                             <div>ยอดค้างชำระ: <strong className="text-rose-600">{parseCleanFloat(cRemainingBalance).toLocaleString()} บ.</strong></div>
@@ -171,7 +166,7 @@
                                             <div className="col-span-2 text-slate-500 font-bold text-[11px]">ประเภท: {isFloat ? "ดอกลอย" : "รายวัน"}</div>
                                         </div>
 
-                                        {/* พื้นที่กลุ่มปุ่มแอ็กชันปุ่มกด */}
+                                        {/* พื้นที่ปุ่มกดแอ็กชัน */}
                                         <div className="flex flex-col gap-2 mt-2">
                                             {!isPaid && (
                                                 <button onClick={() => { setSelectedUser({id: cId, name: cName}); setPayAmount(cCyclePayment); setShowPayModal(true); }} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs transition-all cursor-pointer">
@@ -179,7 +174,7 @@
                                                 </button>
                                             )}
                                             
-                                            {isFloat && (
+                                            {isFloat && !isPaid && (
                                                 <button onClick={() => handleCloseFloatLoan(c)} className="w-full bg-red-600 hover:bg-red-700 text-white font-black py-3 rounded-xl text-xs shadow-md transition-all cursor-pointer border border-red-700 block text-center">
                                                     🚨 ปิดยอดเงินต้นถาวร (จบสัญญา)
                                                 </button>
