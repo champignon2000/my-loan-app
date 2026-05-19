@@ -17,7 +17,9 @@
         const { useState, useEffect } = React;
 
         // ⚠️ ใส่ลิงก์ Web App URL ของคุณที่นี่
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwIBzioIQl_VPuXG6xv2Hah2MBtqTJfzVvHgeSKdKMHyoLr_xjDt9b8fTib-mh0ezy5/exec";
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwIBzioIQl_VPuXG6xv2Hah2MBtqTJfzVvHgeSKdKMHyoLr_xjDt9b8fTib-mh0ezy5/exec
+
+";
 
         function App() {
             const [customers, setCustomers] = useState([]);
@@ -116,16 +118,16 @@
 
                 const success = await sendPostRequest(payload);
                 if (success) {
-                    alert("🎉 ออกสัญญาเงินกู้ใหม่เรียบร้อยแล้ว! (จะเริ่มเก็บเงินงวดแรกในรอบวันถัดไป)");
+                    alert("🎉 ออกสัญญาเงินกู้ใหม่เรียบร้อยแล้ว!");
                     resetForm();
                     setTimeout(loadAllData, 2500);
                 }
             };
 
             const openEditModal = (c) => {
-                const cId = getValueIgnoreCase(c, "id", "");
-                const cName = getValueIgnoreCase(c, "name", "");
-                const cType = getValueIgnoreCase(c, "loan_type", "daily");
+                const cId = getValueIgnoreCase(c, "id", "").toString();
+                const cName = getValueIgnoreCase(c, "name", "").toString();
+                const cType = getValueIgnoreCase(c, "loan_type", "daily").toString();
                 const cPrincipal = getValueIgnoreCase(c, "principal", 0);
                 const cInterest = getValueIgnoreCase(c, "interest_rate", 0);
                 const cDays = getValueIgnoreCase(c, "days_count", 1);
@@ -134,11 +136,11 @@
 
                 setEditId(cId);
                 setName(cName);
-                setLoanType(cType);
+                setLoanType(cType); // กำหนดประเภทให้ตรงกับข้อมูลลูกหนี้คนนั้น
                 setPrincipal(cPrincipal);
-                setInterestRate(cInterest);
+                setInterestRate(cType === "float" ? "" : cInterest);
                 setCustomDays(cDays === "-" || !cDays ? 1 : cDays);
-                setCustomCyclePayment(cCycle);
+                setCustomCyclePayment(cType === "float" ? cCycle : "");
                 setLoanDate(cDate ? formatCleanDate(cDate) : new Date().toISOString().split('T')[0]);
                 setShowEditModal(true);
             };
@@ -203,11 +205,9 @@
                 setLoanDate(new Date().toISOString().split('T')[0]);
             };
 
-            // 🛠️ ฟังก์ชันจัดฟอร์แมตวันที่ให้ดึงข้อมูลปี-เดือน-วัน ออกมาเช็กได้ตรงกันร้อยเปอร์เซ็นต์
             const formatCleanDate = (dateString) => {
                 if (!dateString) return "";
                 try {
-                    // รองรับทั้งแบบ ISO String และ Date Object เดิมจาก Sheets
                     const d = new Date(dateString);
                     if (isNaN(d.getTime())) {
                         return dateString.split('T')[0];
@@ -221,16 +221,26 @@
                 }
             };
 
+            const isDueToday = (loanDateString, daysCount) => {
+                if (!loanDateString) return false;
+                const intervalDays = parseInt(daysCount) || 1;
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                const loanDate = new Date(loanDateString);
+                loanDate.setHours(0,0,0,0);
+                
+                if (today.getTime() === loanDate.getTime()) return false;
+                
+                const diffTime = today.getTime() - loanDate.getTime();
+                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                return (diffDays > 0 && diffDays % intervalDays === 0);
+            };
+
             const isCreatedToday = (dateString) => {
                 if (!dateString) return false;
-                
-                // หาวันที่ของระบบเครื่อง Admin ปัจจุบัน (ปี-เดือน-วัน)
                 const today = new Date();
                 const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-                
-                // แปลงวันที่ของสัญญามาเทียบ
                 const contractStr = formatCleanDate(dateString);
-                
                 return todayStr === contractStr;
             };
 
@@ -239,13 +249,14 @@
                 const cId = getValueIgnoreCase(c, "id", "").toString();
                 const cStatus = getValueIgnoreCase(c, "status", "ค้างชำระ").toString();
                 const cDate = getValueIgnoreCase(c, "loan_date", "").toString();
+                const cDays = getValueIgnoreCase(c, "days_count", 1);
 
                 const searchTxt = search.toLowerCase();
                 const matchesSearch = cName.toLowerCase().includes(searchTxt) || cId.toLowerCase().includes(searchTxt);
                 if (!matchesSearch) return false;
                 
                 if (tab === "pending") {
-                    return cStatus !== "จ่ายแล้ว" && !isCreatedToday(cDate);
+                    return cStatus !== "จ่ายแล้ว" && isDueToday(cDate, cDays);
                 }
                 if (tab === "paid") return cStatus === "จ่ายแล้ว";
                 return true;
@@ -254,7 +265,8 @@
             const pendingCount = customers.filter(c => {
                 const cStatus = getValueIgnoreCase(c, "status", "ค้างชำระ").toString();
                 const cDate = getValueIgnoreCase(c, "loan_date", "").toString();
-                return cStatus !== "จ่ายแล้ว" && !isCreatedToday(cDate);
+                const cDays = getValueIgnoreCase(c, "days_count", 1);
+                return cStatus !== "จ่ายแล้ว" && isDueToday(cDate, cDays);
             }).length;
 
             const summary = customers.reduce((acc, c) => {
