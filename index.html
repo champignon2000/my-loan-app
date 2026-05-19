@@ -15,7 +15,7 @@
 
     <script type="text/babel">
         const { useState, useEffect } = React;
-        
+
         // ⚠️ ใส่ลิงก์ Web App URL ของคุณที่นี่
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzDeqW7sKPngXsvJGxG6mjIJ43KsV44LsyQ0wRfKNNIGqmA-qVMh3CbanFcYrMfo1gp/exec";
 
@@ -31,6 +31,7 @@
             const [selectedUser, setSelectedUser] = useState(null);
             const [payAmount, setPayAmount] = useState("");
 
+            // ฟอร์มข้อมูล
             const [editId, setEditId] = useState("");
             const [name, setName] = useState("");
             const [loanType, setLoanType] = useState("daily");
@@ -55,7 +56,7 @@
                 const cleanTarget = targetKey.toLowerCase().replace(/[^a-z0-9]/g, '');
                 const foundKey = keys.find(k => {
                     const cleanKey = k.toLowerCase().replace(/[^a-z0-9]/g, '');
-                    return cleanKey.includes(cleanTarget) || cleanTarget.includes(cleanKey);
+                    return cleanKey === cleanTarget || cleanKey.includes(cleanTarget) || cleanTarget.includes(cleanKey);
                 });
                 if (foundKey && obj[foundKey] !== undefined && obj[foundKey] !== null && obj[foundKey] !== "") {
                     return obj[foundKey];
@@ -132,7 +133,10 @@
                 const cCycle = getValueIgnoreCase(c, "cycle", 0);
                 const cDate = getValueIgnoreCase(c, "date", "");
 
-                setEditId(cId); setName(cName); setLoanType(cType); setPrincipal(cPrincipal);
+                setEditId(cId);
+                setName(cName);
+                setLoanType(cType); 
+                setPrincipal(cPrincipal);
                 setInterestRate(cType === "float" ? "" : cInterest);
                 setCustomDays(cDays === "-" || !cDays ? 1 : cDays);
                 setCustomCyclePayment(cType === "float" ? cCycle : "");
@@ -166,7 +170,11 @@
                 if (!confirm(`🪙 ยืนยันการชำระเงินจำนวน ${parseFloat(payAmount).toLocaleString()} บาท ใช่หรือไม่?`)) return;
                 
                 setShowPayModal(false);
-                const payload = { action: "recordPayment", id: selectedUser.id, amount: parseFloat(payAmount) };
+                const payload = { 
+                    action: "recordPayment", 
+                    id: selectedUser.id, 
+                    amount: parseFloat(payAmount) 
+                };
                 const success = await sendPostRequest(payload);
                 if (success) {
                     alert(`✅ บันทึกยอดชำระเรียบร้อย!`);
@@ -175,18 +183,8 @@
                 }
             };
 
-            const handleCloseFloatLoan = async (id, name) => {
-                if (!confirm(`🚨 ยืนยันการ "ปิดยอดเงินต้น" ของ "${name}" ใช่หรือไม่?\n(ยอดค้างชำระจะเป็น 0 และจบสัญญาทันที)`)) return;
-                const payload = { action: "closeFloatLoan", id: id };
-                const success = await sendPostRequest(payload);
-                if (success) {
-                    alert(`✅ ปิดยอดเงินต้นสัญญารูปแบบดอกลอยเรียบร้อย!`);
-                    setTimeout(loadAllData, 1500);
-                }
-            };
-
             const handleDeleteCustomer = async (id, name) => {
-                if (!confirm(`⚠️ คำเตือน: ลบสัญญาของ "${name}" (${id}) ถาวรหรือไม่?`)) return;
+                if (!confirm(`⚠️ คำเตือน: คุณแน่ใจใช่ไหมที่จะลบสัญญาของ "${name}" (${id})?\nข้อมูลในระบบ Google Sheets จะถูกลบออกถาวร!`)) return;
                 const payload = { action: "deleteCustomer", id: id };
                 const success = await sendPostRequest(payload);
                 if (success) {
@@ -196,7 +194,8 @@
             };
 
             const resetForm = () => {
-                setEditId(""); setName(""); setLoanType("daily"); setPrincipal(""); 
+                setEditId("");
+                setName(""); setLoanType("daily"); setPrincipal(""); 
                 setInterestRate(""); setCustomDays(1); setCustomCyclePayment("");
                 setLoanDate(new Date().toISOString().split('T')[0]);
             };
@@ -207,7 +206,9 @@
                     const d = new Date(dateString);
                     if (isNaN(d.getTime())) return dateString.split('T')[0];
                     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                } catch (e) { return dateString.split('T')[0]; }
+                } catch (e) {
+                    return dateString.split('T')[0];
+                }
             };
 
             const isDueToday = (loanDateString, daysCount) => {
@@ -251,11 +252,12 @@
                 return cStatus !== "จ่ายแล้ว" && isDueToday(cDate, cDays);
             }).length;
 
+            // 🛠️ แก้ไขการสแกนหาคำระบุคอลัมน์ของ Dashboard ให้แม่นยำขึ้นตรงจุดนี้
             const summary = customers.reduce((acc, c) => {
                 acc.totalPrincipal += parseCleanFloat(getValueIgnoreCase(c, "principal", 0));
-                acc.totalInterest += parseCleanFloat(getValueIgnoreCase(c, "interest", 0));
-                acc.totalRemaining += parseCleanFloat(getValueIgnoreCase(c, "balan", 0));
-                acc.totalPaid += parseCleanFloat(getValueIgnoreCase(c, "paid", 0));
+                acc.totalInterest += parseCleanFloat(getValueIgnoreCase(c, "interest_rate", 0));
+                acc.totalRemaining += parseCleanFloat(getValueIgnoreCase(c, "remaining_balance", 0));
+                acc.totalPaid += parseCleanFloat(getValueIgnoreCase(c, "paid_amount", 0));
                 return acc;
             }, { totalPrincipal: 0, totalInterest: 0, totalRemaining: 0, totalPaid: 0 });
 
@@ -323,13 +325,13 @@
                                 const cId = getValueIgnoreCase(c, "id", "").toString();
                                 const cName = getValueIgnoreCase(c, "name", "").toString();
                                 const cType = getValueIgnoreCase(c, "loantype", "daily").toString();
-                                const cTotal = getValueIgnoreCase(c, "total", 0);
-                                const cPaid = getValueIgnoreCase(c, "paid", 0); // 💡 ดึงค่ายอดที่ชำระไปแล้วสะสมมาใช้งาน
-                                const cRemaining = getValueIgnoreCase(c, "balan", 0);
-                                const cDays = getValueIgnoreCase(c, "days", 1);
-                                const cCycle = getValueIgnoreCase(c, "cycle", 0);
+                                const cTotal = getValueIgnoreCase(c, "total_amount", 0);
+                                const cPaid = getValueIgnoreCase(c, "paid_amount", 0); // 🛠️ เพิ่มจุดนี้ดึงค่าจาก paid_amount
+                                const cRemaining = getValueIgnoreCase(c, "remaining_balance", 0); // 🛠️ ปรับให้ตรงคอลัมน์ตรง ๆ
+                                const cDays = getValueIgnoreCase(c, "days_count", 1);
+                                const cCycle = getValueIgnoreCase(c, "cycle_payment", 0);
                                 const cStatus = getValueIgnoreCase(c, "status", "ค้างชำระ").toString();
-                                const cDate = getValueIgnoreCase(c, "date", "").toString();
+                                const cDate = getValueIgnoreCase(c, "loan_date", "").toString();
                                 const hasProfile = profiles.some(p => getValueIgnoreCase(p, "id", "").toString() === cId);
                                 const todayContract = isCreatedToday(cDate);
                                 return (
@@ -359,31 +361,24 @@
                                                 <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200"><i className="fa-solid fa-triangle-exclamation"></i> ⚠️ ยังไม่ได้ลงประวัติส่วนตัว</span>
                                            )}
                                             {todayContract && (
-                                               <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200"><i className="fa-solid fa-clock"></i> สัญญาวันแรก</span>
+                                               <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200"><i className="fa-solid fa-clock"></i> สัญญาวันแรก (เริ่มเก็บรอบถัดไป)</span>
                                             )}
                                         </div>
 
-                                        {/* Grid ข้อมูลค่างวด - อัปเดตให้แสดงผลยอดชำระแล้วเรียบร้อย */}
+                                        {/* 🛠️ เพิ่มบรรทัดแสดงผล "ยอดที่ชำระแล้ว:" เข้าไปในระบบ */}
                                         <div className="grid grid-cols-2 gap-y-1.5 text-xs text-slate-600 border-t border-slate-100 pt-2.5 mb-3">
                                             <div>ยอดรวมสัญญา: <strong className="text-slate-900">{parseCleanFloat(cTotal).toLocaleString()} บ.</strong></div>
                                             <div>ยอดที่ชำระแล้ว: <strong className="text-emerald-600">{parseCleanFloat(cPaid).toLocaleString()} บ.</strong></div>
                                             <div>ยอดค้างชำระ: <strong className="text-rose-600">{parseCleanFloat(cRemaining).toLocaleString()} บ.</strong></div>
                                             <div>ยอดจัดเก็บต่อรอบ: <span className="text-indigo-600 font-black">{parseCleanFloat(cCycle).toLocaleString()} บ.</span></div>
                                             <div>รอบส่งงาน: <span className="text-slate-700 font-bold">ทุก ๆ {cDays || "1"} วัน</span></div>
-                                            <div className="text-slate-400 text-[11px]">ประเภท: {cType === "float" ? "ดอกลอย" : "รายวัน (ตัดต้นดอก)"}</div>
+                                            <div className="text-slate-400 text-[11px]">ประเภท: {cType === "float" ? "ดอกลอย" : "รายวัน (ตัดต้นตัดดอก)"}</div>
                                         </div>
 
                                         {cStatus !== "จ่ายแล้ว" && (
-                                            <div className="flex gap-2">
-                                                <button onClick={() => { setSelectedUser({id: cId, name: cName, cycle_payment: cCycle}); setPayAmount(cCycle); setShowPayModal(true); }} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl text-xs shadow-xs transition-all cursor-pointer">
-                                                    🪙 เก็บดอก/ค่างวด
-                                                </button>
-                                                {cType === "float" && (
-                                                    <button onClick={() => handleCloseFloatLoan(cId, cName)} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-xl text-xs shadow-xs transition-all cursor-pointer">
-                                                        🔒 ปิดยอดเงินต้น
-                                                    </button>
-                                                )}
-                                            </div>
+                                            <button onClick={() => { setSelectedUser({id: cId, name: cName, cycle_payment: cCycle}); setPayAmount(cCycle); setShowPayModal(true); }} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl text-xs shadow-xs transition-all cursor-pointer">
+                                                🪙 บันทึกการรับชำระเงินงวดนี้
+                                            </button>
                                         )}
                                      </div>
                                 );
@@ -420,6 +415,7 @@
                                     </div>
                                      <div>
                                         <label className="block text-xs font-bold text-slate-500 mb-1">ระยะเวลาต่อการส่งยอด/ดอก (วัน)</label>
+                                        <span className="text-[10px] text-slate-400 block mb-1">* ตัวอย่าง: ใส่เลข 1 = ส่งทุกวัน, ใส่เลข 3 = ทุก 3 วันส่ง 1 ครั้ง</span>
                                         <input type="number" min="1" value={customDays} onChange={(e) => setCustomDays(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none" />
                                     </div>
                                     {loanType === "float" && (
@@ -491,7 +487,7 @@
                         </div>
                     )}
 
-                    {/* Modal Record Payment */}
+                    {/* Modal Payment */}
                     {showPayModal && selectedUser && (
                         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
                              <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl">
