@@ -17,9 +17,7 @@
         const { useState, useEffect } = React;
 
         // ⚠️ ใส่ลิงก์ Web App URL ของคุณที่นี่
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwIBzioIQl_VPuXG6xv2Hah2MBtqTJfzVvHgeSKdKMHyoLr_xjDt9b8fTib-mh0ezy5/exec
-
-";
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwIBzioIQl_VPuXG6xv2Hah2MBtqTJfzVvHgeSKdKMHyoLr_xjDt9b8fTib-mh0ezy5/exec";
 
         function App() {
             const [customers, setCustomers] = useState([]);
@@ -34,7 +32,7 @@
             const [selectedUser, setSelectedUser] = useState(null);
             const [payAmount, setPayAmount] = useState("");
 
-            // ฟอร์มข้อมูลสัญญา
+            // ฟอร์มข้อมูลสำหรับ "ออกสัญญาใหม่" และ "แก้ไขสัญญา" (ใช้ชุดเดียวกันเพื่อความเสถียร)
             const [editId, setEditId] = useState(""); 
             const [name, setName] = useState("");
             const [loanType, setLoanType] = useState("daily");
@@ -72,7 +70,7 @@
                     try {
                         const resProf = await fetch(`${SCRIPT_URL}?action=getProfiles`);
                         dataProf = await resProf.json();
-                    } catch(e) { console.log("Profile sheet log empty"); }
+                    } catch(e) { console.log("Profile sheet empty"); }
                     
                     setCustomers(Array.isArray(dataCust) ? dataCust : []);
                     setProfiles(Array.isArray(dataProf) ? dataProf : []);
@@ -120,7 +118,7 @@
                 if (success) {
                     alert("🎉 ออกสัญญาเงินกู้ใหม่เรียบร้อยแล้ว!");
                     resetForm();
-                    setTimeout(loadAllData, 2500);
+                    setTimeout(loadAllData, 1000);
                 }
             };
 
@@ -136,7 +134,7 @@
 
                 setEditId(cId);
                 setName(cName);
-                setLoanType(cType); // กำหนดประเภทให้ตรงกับข้อมูลลูกหนี้คนนั้น
+                setLoanType(cType); 
                 setPrincipal(cPrincipal);
                 setInterestRate(cType === "float" ? "" : cInterest);
                 setCustomDays(cDays === "-" || !cDays ? 1 : cDays);
@@ -163,7 +161,7 @@
                 if (success) {
                     alert("📝 แก้ไขข้อมูลสัญญาเรียบร้อยแล้ว!");
                     resetForm();
-                    setTimeout(loadAllData, 2500);
+                    setTimeout(loadAllData, 1000);
                 }
             };
 
@@ -184,7 +182,7 @@
                 if (success) {
                     alert(`✅ บันทึกยอดชำระเรียบร้อย!`);
                     setPayAmount("");
-                    setTimeout(loadAllData, 2500);
+                    setTimeout(loadAllData, 1000);
                 }
             };
 
@@ -195,7 +193,7 @@
                 const success = await sendPostRequest(payload);
                 if (success) {
                     alert("🗑️ ลบข้อมูลสัญญาออกจากระบบสำเร็จ!");
-                    setTimeout(loadAllData, 2500);
+                    setTimeout(loadAllData, 1000);
                 }
             };
 
@@ -226,6 +224,7 @@
                 const intervalDays = parseInt(daysCount) || 1;
                 const today = new Date();
                 today.setHours(0,0,0,0);
+                
                 const loanDate = new Date(loanDateString);
                 loanDate.setHours(0,0,0,0);
                 
@@ -443,7 +442,7 @@
                                         <input type="date" value={loanDate} onChange={(e) => setLoanDate(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none" />
                                     </div>
                                     <div className="flex gap-2 pt-2">
-                                        <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 bg-slate-100 text-slate-500 py-2.5 rounded-xl text-xs font-bold cursor-pointer">ยกเลิก</button>
+                                        <button type="button" onClick={() => { setShowAddModal(false); resetForm(); }} className="flex-1 bg-slate-100 text-slate-500 py-2.5 rounded-xl text-xs font-bold cursor-pointer">ยกเลิก</button>
                                         <button type="submit" className="flex-1 bg-emerald-500 text-white py-2.5 rounded-xl text-xs font-bold cursor-pointer">บันทึกเปิดสัญญา</button>
                                     </div>
                                 </form>
