@@ -37,7 +37,7 @@
                 return parseFloat(val.toString().replace(/,/g, '').trim()) || 0;
             };
 
-            // ฟังก์ชันพิเศษ: ดึงค่าจาก Object โดยไม่สนใจเรื่องตัวพิมพ์เล็ก-ใหญ่ หรือ ขีดล่าง (snake_case vs camelCase)
+            // ระบบดึงค่าแบบยืดหยุ่นสูง ป้องกันการสะกดคีย์สลับพิมพ์เล็ก-ใหญ่ หรือ snake_case
             const getFlexibleValue = (obj, key) => {
                 if (!obj) return "";
                 const target = key.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -56,8 +56,8 @@
                     const dataCust = await resCust.json();
                     setCustomers(Array.isArray(dataCust) ? dataCust : []);
                 } catch (err) { 
-                    console.error(err); 
-                } Jack: finally {
+                    console.error("Error loading data:", err); 
+                } finally {
                     setLoading(false);
                 }
             };
@@ -129,7 +129,7 @@
                         <button onClick={() => setTab("paid")} className={`py-2 text-xs font-bold rounded-lg cursor-pointer ${tab === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-500'}`}>จ่ายแล้ว ({customers.filter(c=>checkIfPaidSuccess(c)).length})</button>
                     </div>
 
-                    {/* การ์ดรายชื่อลูกหนี้ */}
+                    {/* รายชื่อการ์ดลูกหนี้ */}
                     <div className="flex-1 p-3 space-y-3 overflow-y-auto">
                         {loading ? (
                             <div className="text-center py-20 text-slate-400"><i className="fa-solid fa-circle-notch fa-spin text-2xl text-indigo-600 mb-2"></i><p className="text-xs">กำลังดึงข้อมูล...</p></div>
@@ -140,7 +140,6 @@
                                 const cId = getFlexibleValue(c, "id").toString();
                                 const cName = getFlexibleValue(c, "name").toString();
                                 
-                                // 🔒 ใช้ระบบดึงค่าแบบยืดหยุ่นสูง เพื่อให้เจอยอดชัวร์ ๆ ไม่ว่าจะส่งคีย์มาแบบไหน
                                 const rawType = getFlexibleValue(c, "loanType").toString().toLowerCase().replace(/\s+/g, '');
                                 const cTotalAmount = getFlexibleValue(c, "totalAmount") || getFlexibleValue(c, "total_amount") || 0;
                                 const cRemainingBalance = getFlexibleValue(c, "remainingBalance") || getFlexibleValue(c, "remaining_balance") || 0; 
@@ -172,16 +171,14 @@
                                             <div className="col-span-2 text-slate-500 font-bold text-[11px]">ประเภท: {isFloat ? "ดอกลอย" : "รายวัน"}</div>
                                         </div>
 
-                                        {/* 📍 พื้นที่ใส่ปุ่มแอ็กชันใต้อักษรข้อมูลตัวเลข */}
+                                        {/* พื้นที่กลุ่มปุ่มแอ็กชันปุ่มกด */}
                                         <div className="flex flex-col gap-2 mt-2">
-                                            {/* ปุ่มที่ 1: บันทึกส่งเงินปกติ (ซ่อนเมื่อจ่ายแล้ว) */}
                                             {!isPaid && (
                                                 <button onClick={() => { setSelectedUser({id: cId, name: cName}); setPayAmount(cCyclePayment); setShowPayModal(true); }} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs transition-all cursor-pointer">
                                                     🪙 {isFloat ? "บันทึกการส่งดอกรอบนี้" : "บันทึกการชำระค่างวด"}
                                                 </button>
                                             )}
                                             
-                                            {/* 🚨 ปุ่มที่ 2: ปุ่มปิดยอดเงินต้นถาวร (สำหรับดอกลอย) จะอยู่ตรงนี้ด้านล่างสุด โชว์ค้างไว้เสมอเพื่อรอให้คุณกดปิดสัญญาครับ */}
                                             {isFloat && (
                                                 <button onClick={() => handleCloseFloatLoan(c)} className="w-full bg-red-600 hover:bg-red-700 text-white font-black py-3 rounded-xl text-xs shadow-md transition-all cursor-pointer border border-red-700 block text-center">
                                                     🚨 ปิดยอดเงินต้นถาวร (จบสัญญา)
