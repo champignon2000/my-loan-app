@@ -14,15 +14,16 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useMemo } = React;
 
-        // ⚠️ อย่าลืมใส่ลิงก์ Web App URL ของคุณที่นี่ก่อนใช้งาน
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzHB_fDwEWthk-HO0hI2vfYSRYJObR9X2k05YDCTxwN7pO5G1M6hjwuD-0y2cNvbk1i/exec";
+        // ⚠️ อย่าลืมใส่ลิงก์ Web App URL ของคุณที่นี่ก่อนอัปโหลดขึ้น Vercel
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzvY4sC2vHdSM7O5qVYq1ktsjlkhk9mL_y5fpuqql_HJ14iVfBK2piaCOHsAUopVHlB/exec"; 
 
         function App() {
             const [customers, setCustomers] = useState([]);
             const [profiles, setProfiles] = useState([]);
             const [loading, setLoading] = useState(true);
+            const [dashLoading, setDashLoading] = useState(true); // แยกตัวโหลดแดชบอร์ดเพื่อความเร็ว
             const [search, setSearch] = useState("");
             const [tab, setTab] = useState("all"); 
             
@@ -30,122 +31,115 @@
             const [selectedUser, setSelectedUser] = useState(null);
             const [payAmount, setPayAmount] = useState("");
 
-            useEffect(() => { loadAllData(); }, []);
+            useEffect(() => { loadInitialData(); }, []);
 
             const parseCleanFloat = (val) => {
                 if (val === undefined || val === null || val === "") return 0;
                 if (typeof val === 'number') return val;
-                const clean = val.toString().replace(/,/g, '').trim();
-                return parseFloat(clean) || 0;
+                return parseFloat(val.toString().replace(/,/g, '').trim()) || 0;
             };
 
             const getValueFromSheet = (obj, targetKey, defaultValue = "") => {
-                if (!obj) return defaultValue;
-                if (obj[targetKey] !== undefined && obj[targetKey] !== null) {
-                    return obj[targetKey];
-                }
-                return defaultValue;
+                return (obj && obj[targetKey] !== undefined && obj[targetKey] !== null) ? obj[targetKey] : defaultValue;
             };
 
-            const loadAllData = async () => {
+            // โหลดรายชื่อขึ้นมาแสดงผลทันทีก่อนเพื่อความไวสูงสุด
+            const loadInitialData = async () => {
                 setLoading(true);
                 try {
                     const resCust = await fetch(`${SCRIPT_URL}?action=getCustomers`);
                     const dataCust = await resCust.json();
-                    let dataProf = [];
+                    setCustomers(Array.isArray(dataCust) ? dataCust : []);
+                    setLoading(false); // ⚡ ปลดล็อกหน้าจอให้เห็นรายชื่อลูกหนี้ทันที!
+
+                    // ค่อยแอบโหลดข้อมูล Profile ตามมาข้างหลังเงียบๆ ไม่ขัดจังหวะการกด
+                    setDashLoading(true);
                     try {
                         const resProf = await fetch(`${SCRIPT_URL}?action=getProfiles`);
-                        dataProf = await resProf.json();
-                    } catch(e) { console.log("Profile log empty"); }
-                    
-                    setCustomers(Array.isArray(dataCust) ? dataCust : []);
-                    setProfiles(Array.isArray(dataProf) ? dataProf : []);
+                        const dataProf = await resProf.json();
+                        setProfiles(Array.isArray(dataProf) ? dataProf : []);
+                    } catch(e) { console.log("Profiles background load skipped"); }
+                    setDashLoading(false);
                 } catch (err) { 
-                    console.error("Error loading data:", err); 
-                } finaly {
+                    console.error("Error running application data:", err); 
                     setLoading(false);
-                }
-            };
-
-            const sendPostRequest = async (payload) => {
-                setLoading(true);
-                try {
-                    await fetch(SCRIPT_URL, {
-                        method: "POST",
-                        mode: "no-cors",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(payload)
-                    });
-                    return true;
-                } catch (error) {
-                    console.error("Post Error:", error);
-                    return false;
-                } finally {
-                    setLoading(false);
+                    setDashLoading(false);
                 }
             };
 
             const handlePayment = async (e) => {
                 e.preventDefault();
                 if (!payAmount || parseFloat(payAmount) <= 0) return;
-                
-                if (!confirm(`🪙 ยืนยันบันทึกการจัดเก็บเงินจำนวน ${parseFloat(payAmount).toLocaleString()} บาท?`)) return;
+                if (!confirm(`🪙 ยืนยันบันทึกยอดจัดเก็บจำนวน ${parseFloat(payAmount).toLocaleString()} บาท?`)) return;
                 
                 setShowPayModal(false);
-                const payload = { 
-                    action: "recordPayment", 
-                    id: selectedUser.id, 
-                    amount: parseFloat(payAmount) 
-                };
-
-                const success = await sendPostRequest(payload);
-                if (success) {
+                setLoading(true);
+                
+                try {
+                    await fetch(SCRIPT_URL, {
+                        method: "POST",
+                        mode: "no-cors",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ action: "recordPayment", id: selectedUser.id, amount: parseFloat(payAmount) })
+                    });
                     alert(`✅ บันทึกยอดจัดเก็บสำเร็จ!`);
                     setPayAmount("");
-                    setTimeout(loadAllData, 1000);
+                    setTimeout(loadInitialData, 500);
+                } catch(err) {
+                    alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+                    setLoading(false);
                 }
             };
 
-            // ฟังก์ชันสำหรับกดปุ่มปิดต้นดอกลอยโดยเฉพาะ
             const handleCloseFloatLoan = async (cust) => {
-                const remainingBalan = parseCleanFloat(getValueFromSheet(cust, "remaining_balance", 0));
-                if (!confirm(`🚨 คุณมั่นใจใช่ไหมว่าต้องการ "ปิดต้น" ของคุณ ${cust.name}?\nลูกหนี้นำเงินต้นก้อนสุดท้ายจำนวน ${remainingBalan.toLocaleString()} บาท มาเคลียร์ปิดสัญญานี้ถาวรแล้ว`)) return;
+                const remBal = parseCleanFloat(getValueFromSheet(cust, "remaining_balance", 0));
+                if (!confirm(`🚨 คุณมั่นใจใช่ไหมว่าต้องการ "ปิดต้นถาวร" ของคุณ ${cust.name}?\nสัญญานี้จะถูกเคลียร์ยอดค้างชำระเป็น 0 และปิดจบสัญญาทันที`)) return;
                 
-                const payload = {
-                    action: "closeFloatLoan",
-                    id: cust.id
-                };
-                
-                const success = await sendPostRequest(payload);
-                if (success) {
+                setLoading(true);
+                try {
+                    await fetch(SCRIPT_URL, {
+                        method: "POST",
+                        mode: "no-cors",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ action: "closeFloatLoan", id: cust.id })
+                    });
                     alert(`🎉 ปิดสัญญากู้ดอกลอยสำเร็จ สัญญาเด้งไปหน้าจ่ายแล้วเรียบร้อยครับ!`);
-                    setTimeout(loadAllData, 1000);
+                    setTimeout(loadInitialData, 500);
+                } catch(err) {
+                    alert("เกิดข้อผิดพลาด");
+                    setLoading(false);
                 }
             };
 
             const checkIfPaidSuccess = (c) => {
-                const cStatus = getValueFromSheet(c, "status", "ค้างชำระ").toString();
-                return cStatus === "จ่ายแล้ว";
+                return getValueFromSheet(c, "status", "ค้างชำระ").toString() === "จ่ายแล้ว";
             };
 
-            // คำนวณสรุป Dashboard ด้านบน
-            const totalPrincipal = customers.reduce((sum, c) => sum + parseCleanFloat(getValueFromSheet(c, "principal", 0)), 0);
-            const totalRemaining = customers.reduce((sum, c) => sum + parseCleanFloat(getValueFromSheet(c, "remaining_balance", 0)), 0);
-            const totalPaid = customers.reduce((sum, c) => sum + parseCleanFloat(getValueFromSheet(c, "paid_amount", 0)), 0);
-            const calculatedInterest = customers.reduce((sum, c) => sum + parseCleanFloat(getValueFromSheet(c, "interest_rate", 0)), 0);
+            // ใช้ useMemo ในการจำค่าคำนวณ เพื่อไม่ให้คอมพิวเตอร์ทำงานซ้ำซ้อนตอนพิมพ์ค้นหาชื่อ
+            const dashboardStats = useMemo(() => {
+                let principal = 0, remaining = 0, paid = 0, interest = 0;
+                customers.forEach(c => {
+                    principal += parseCleanFloat(getValueFromSheet(c, "principal", 0));
+                    remaining += parseCleanFloat(getValueFromSheet(c, "remaining_balance", 0));
+                    paid += parseCleanFloat(getValueFromSheet(c, "paid_amount", 0));
+                    interest += parseCleanFloat(getValueFromSheet(c, "interest_rate", 0));
+                });
+                return { principal, remaining, paid, interest };
+            }, [customers]);
 
-            const filtered = customers.filter(c => {
-                const cName = getValueFromSheet(c, "name", "").toString();
-                const cId = getValueFromSheet(c, "id", "").toString();
-                const searchTxt = search.toLowerCase();
-                const matchesSearch = cName.toLowerCase().includes(searchTxt) || cId.toLowerCase().includes(searchTxt);
-                if (!matchesSearch) return false;
-                
-                const isPaid = checkIfPaidSuccess(c);
-                if (tab === "pending") return !isPaid;
-                if (tab === "paid") return isPaid;
-                return true; 
-            });
+            const filteredCustomers = useMemo(() => {
+                return customers.filter(c => {
+                    const cName = getValueFromSheet(c, "name", "").toString().toLowerCase();
+                    const cId = getValueFromSheet(c, "id", "").toString().toLowerCase();
+                    const searchTxt = search.toLowerCase();
+                    if (!cName.includes(searchTxt) && !cId.includes(searchTxt)) return false;
+                    
+                    const isPaid = checkIfPaidSuccess(c);
+                    if (tab === "pending") return !isPaid;
+                    if (tab === "paid") return isPaid;
+                    return true;
+                });
+            }, [customers, search, tab]);
 
             return (
                 <div className="max-w-md mx-auto min-h-screen flex flex-col bg-slate-50 shadow-2xl border-x border-slate-200">
@@ -164,42 +158,42 @@
                             <i className="fa-solid fa-magnifying-glass absolute left-3.5 top-3.5 text-blue-200 pointer-events-none"></i>
                         </div>
 
-                        {/* Dashboard ข้อมูลทุนและดอกเบี้ย */}
+                        {/* Dashboard ข้อมูลทุนแบบ Lazy Load ประมวลผลไวขึ้น */}
                         <div className="bg-white text-slate-800 rounded-2xl p-4 shadow-inner grid grid-cols-2 gap-3">
                             <div className="bg-blue-50/70 p-3 rounded-xl border border-blue-100">
                                 <p className="text-[10px] font-bold text-slate-500">💰 เงินต้นปล่อยทั้งหมด</p>
-                                <p className="text-base font-black text-blue-700">{totalPrincipal.toLocaleString()} บ.</p>
+                                <p className="text-base font-black text-blue-700">{dashLoading ? "..." : dashboardStats.principal.toLocaleString()} บ.</p>
                             </div>
                             <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-100">
                                 <p className="text-[10px] font-bold text-slate-500">📈 ดอกเบี้ยตามระบบ</p>
-                                <p className="text-base font-black text-emerald-700">{calculatedInterest.toLocaleString()} บ.</p>
+                                <p className="text-base font-black text-emerald-700">{dashLoading ? "..." : dashboardStats.interest.toLocaleString()} บ.</p>
                             </div>
                             <div className="bg-purple-50/70 p-3 rounded-xl border border-purple-100">
-                                <p className="text-[10px] font-bold text-slate-500">📥 เก็บยอดกลับมาแล้วทั้งหมด</p>
-                                <p className="text-base font-black text-purple-700">{totalPaid.toLocaleString()} บ.</p>
+                                <p className="text-[10px] font-bold text-slate-500">📥 เก็บยอดกลับมาแล้ว</p>
+                                <p className="text-base font-black text-purple-700">{dashLoading ? "..." : dashboardStats.paid.toLocaleString()} บ.</p>
                             </div>
                             <div className="bg-rose-50/70 p-3 rounded-xl border border-rose-100">
                                 <p className="text-[10px] font-bold text-slate-500">📉 ยอดค้างรอเก็บรวม</p>
-                                <p className="text-base font-black text-rose-700">{totalRemaining.toLocaleString()} บ.</p>
+                                <p className="text-base font-black text-rose-700">{dashLoading ? "..." : dashboardStats.remaining.toLocaleString()} บ.</p>
                             </div>
                         </div>
                     </div>
 
-                    {/* Tabs */}
+                    {/* Tabs ตัวกรองสถานะ */}
                     <div className="grid grid-cols-3 gap-1 bg-white p-1.5 border-b border-slate-200">
-                        <button onClick={() => setTab("all")} className={`py-2 text-xs font-bold rounded-lg cursor-pointer ${tab === 'all' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500'}`}>ทั้งหมด ({customers.length})</button>
-                        <button onClick={() => setTab("pending")} className={`py-2 text-xs font-bold rounded-lg cursor-pointer ${tab === 'pending' ? 'bg-amber-50 text-amber-700' : 'text-slate-500'}`}>ค้างชำระ ({customers.filter(c=>!checkIfPaidSuccess(c)).length})</button>
-                        <button onClick={() => setTab("paid")} className={`py-2 text-xs font-bold rounded-lg cursor-pointer ${tab === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-500'}`}>จ่ายแล้ว ({customers.filter(c=>checkIfPaidSuccess(c)).length})</button>
+                        <button onClick={() => setTab("all")} className={`py-2 text-xs font-bold rounded-lg cursor-pointer transition-all ${tab === 'all' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500'}`}>ทั้งหมด ({customers.length})</button>
+                        <button onClick={() => setTab("pending")} className={`py-2 text-xs font-bold rounded-lg cursor-pointer transition-all ${tab === 'pending' ? 'bg-amber-50 text-amber-700' : 'text-slate-500'}`}>ค้างชำระ ({customers.filter(c=>!checkIfPaidSuccess(c)).length})</button>
+                        <button onClick={() => setTab("paid")} className={`py-2 text-xs font-bold rounded-lg cursor-pointer transition-all ${tab === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-500'}`}>จ่ายแล้ว ({customers.filter(c=>checkIfPaidSuccess(c)).length})</button>
                     </div>
 
-                    {/* List */}
+                    {/* รายชื่อลูกหนี้ลูกค้า */}
                     <div className="flex-1 p-3 space-y-3 overflow-y-auto">
                         {loading ? (
-                            <div className="text-center py-20 text-slate-400"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-indigo-600 mb-3"></i><p className="text-xs">กำลังโหลดข้อมูล...</p></div>
-                        ) : filtered.length === 0 ? (
-                            <div className="text-center py-20 text-slate-400 text-sm">📭 ไม่พบข้อมูลข้อมูล</div>
+                            <div className="text-center py-20 text-slate-400"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-indigo-600 mb-3"></i><p className="text-xs">กำลังสปีดโหลดข้อมูลให้ไวขึ้น...</p></div>
+                        ) : filteredCustomers.length === 0 ? (
+                            <div className="text-center py-20 text-slate-400 text-sm">📭 ไม่พบรายชื่อข้อมูลสัญญากู้ยืม</div>
                         ) : (
-                            filtered.map(c => {
+                            filteredCustomers.map(c => {
                                 const cId = getValueFromSheet(c, "id").toString();
                                 const cName = getValueFromSheet(c, "name").toString();
                                 const cType = getValueFromSheet(c, "loanType").toString(); 
@@ -228,29 +222,27 @@
 
                                         <div className="mb-3 flex flex-wrap gap-1">
                                             {hasProfile ? (
-                                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">✓ ตรวจพบประวัติแล้ว</span>
+                                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">✓ ประวัติเรียบร้อย</span>
                                             ) : (
-                                                <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">⚠️ ยังไม่ได้ลงประวัติส่วนตัว</span>
+                                                <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">⚠️ ยังไม่ได้ลงประวัติ</span>
                                             )}
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-y-1.5 text-xs text-slate-600 border-t border-slate-100 pt-2.5 mb-3">
-                                            <div>ยอดเงินต้นปล่อย: <strong className="text-slate-900">{parseCleanFloat(cTotal).toLocaleString()} บ.</strong></div>
+                                            <div>ยอดรวมสัญญา: <strong className="text-slate-900">{parseCleanFloat(cTotal).toLocaleString()} บ.</strong></div>
                                             <div>ยอดค้างชำระ: <strong className="text-rose-600">{parseCleanFloat(cRemaining).toLocaleString()} บ.</strong></div>
                                             <div>รอบส่งงาน: <span className="text-indigo-600 font-bold">ทุก ๆ {cDays} วัน</span></div>
                                             <div>ยอดจัดเก็บต่อรอบ: <span className="text-emerald-600 font-black">{parseCleanFloat(cCycle).toLocaleString()} บ.</span></div>
                                             <div className="col-span-2 text-slate-400 text-[11px]">ยอดส่งสะสมแล้ว: <span className="text-blue-600 font-bold">{parseCleanFloat(cPaid).toLocaleString()} บ.</span></div>
-                                            <div className="col-span-2 text-slate-500 font-bold text-[11px]">ประเภท: {cType === "float" ? "ดอกลอย (ส่งเฉพาะดอกเบี้ย)" : "รายวัน (หักทั้งต้นทั้งดอก)"}</div>
+                                            <div className="col-span-2 text-slate-500 font-bold text-[11px]">ประเภท: {cType === "float" ? "ดอกลอย (ส่งดอกไม่หักต้น)" : "รายวัน (หักทั้งต้นทั้งดอก)"}</div>
                                         </div>
 
-                                        {/* ควบคุมปุ่มกดสำหรับสถานะค้างชำระ */}
                                         {!isPaid && (
                                             <div className="flex flex-col gap-1.5">
                                                 <button onClick={() => { setSelectedUser({id: cId, name: cName}); setPayAmount(cCycle); setShowPayModal(true); }} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl text-xs shadow-sm transition-all cursor-pointer">
                                                     🪙 {cType === "float" ? "บันทึกการส่งดอกรอบนี้" : "บันทึกการชำระค่างวด"}
                                                 </button>
                                                 
-                                                {/* 🌟 ปุ่มลับเฉพาะสัญญาลอย: กดปิดยอดเงินต้นเมื่อเอาเงินก้อนมาตัด */}
                                                 {cType === "float" && (
                                                     <button onClick={() => handleCloseFloatLoan(c)} className="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold py-1.5 rounded-xl text-[11px] shadow-sm transition-all cursor-pointer">
                                                         🚨 ลูกหนี้นำเงินก้อนมา "ปิดต้นถาวร"
@@ -264,11 +256,11 @@
                         )}
                     </div>
 
-                    {/* Modal Payment */}
+                    {/* Pop-up บันทึกจ่ายเงิน */}
                     {showPayModal && selectedUser && (
                         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
                             <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl">
-                                <h3 className="text-base font-black text-slate-800 mb-4">🪙 บันทึกรับยอดเงิน: {selectedUser.name}</h3>
+                                <h3 className="text-base font-black text-slate-800 mb-4">🪙 บันทึกรับเงิน: {selectedUser.name}</h3>
                                 <form onSubmit={handlePayment} className="space-y-4">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 mb-1">จำนวนเงินที่เก็บได้รอบนี้ (บาท)</label>
@@ -276,7 +268,7 @@
                                     </div>
                                     <div className="flex gap-2">
                                         <button type="button" onClick={() => setShowPayModal(false)} className="flex-1 bg-slate-100 text-slate-500 py-2.5 rounded-xl text-xs font-bold cursor-pointer">ยกเลิก</button>
-                                        <button type="submit" className="flex-1 bg-indigo-600 text-white py-2.5 rounded-xl text-xs font-bold cursor-pointer">ยืนยันรับยอดเงิน</button>
+                                        <button type="submit" className="flex-1 bg-indigo-600 text-white py-2.5 rounded-xl text-xs font-bold cursor-pointer">ยืนยันรับเงิน</button>
                                     </div>
                                 </form>
                             </div>
