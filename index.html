@@ -349,6 +349,7 @@
                                 const cName = getValueIgnoreCase(c, "name", "").toString();
                                 const cType = getValueIgnoreCase(c, "loantype", "daily").toString();
                                 const cTotal = getValueIgnoreCase(c, "total", 0);
+                                const cPaid = getValueIgnoreCase(c, "paid", 0); // ดึงค่ายอดที่ชำระไปแล้วสะสม
                                 const cRemaining = getValueIgnoreCase(c, "balan", 0);
                                 const cDays = getValueIgnoreCase(c, "days", 1);
                                 const cCycle = getValueIgnoreCase(c, "cycle", 0);
@@ -387,12 +388,14 @@
                                             )}
                                         </div>
 
+                                        {/* Grid ข้อมูลค่างวด - เพิ่มการแสดงผลยอดส่งแล้วสะสม */}
                                         <div className="grid grid-cols-2 gap-y-1.5 text-xs text-slate-600 border-t border-slate-100 pt-2.5 mb-3">
                                             <div>ยอดรวมสัญญา: <strong className="text-slate-900">{parseCleanFloat(cTotal).toLocaleString()} บ.</strong></div>
+                                            <div>ยอดที่ชำระแล้ว: <strong className="text-emerald-600">{parseCleanFloat(cPaid).toLocaleString()} บ.</strong></div>
                                             <div>ยอดค้างชำระ: <strong className="text-rose-600">{parseCleanFloat(cRemaining).toLocaleString()} บ.</strong></div>
-                                            <div>รอบส่งงาน: <span className="text-indigo-600 font-bold">ทุก ๆ {cDays || "1"} วัน</span></div>
-                                            <div>ยอดจัดเก็บต่อรอบ: <span className="text-emerald-600 font-black">{parseCleanFloat(cCycle).toLocaleString()} บ.</span></div>
-                                            <div className="col-span-2 text-slate-400 text-[11px]">ประเภทสัญญากู้: {cType === "float" ? "ดอกลอย" : "รายวัน (ตัดต้นตัดดอก)"}</div>
+                                            <div>ยอดจัดเก็บต่อรอบ: <span className="text-indigo-600 font-black">{parseCleanFloat(cCycle).toLocaleString()} บ.</span></div>
+                                            <div>รอบส่งงาน: <span className="text-slate-700 font-bold">ทุก ๆ {cDays || "1"} วัน</span></div>
+                                            <div className="text-slate-400 text-[11px]">ประเภท: {cType === "float" ? "ดอกลอย" : "รายวัน (ตัดต้นดอก)"}</div>
                                         </div>
 
                                         {cStatus !== "จ่ายแล้ว" && (
