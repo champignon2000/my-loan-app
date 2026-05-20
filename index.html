@@ -17,7 +17,7 @@
         const { useState, useEffect } = React;
 
         // ⚠️ ใส่ลิงก์ Web App URL ตัวล่าสุดของคุณที่นี่ครับ
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbqY5H6Cc1SEKwFqoeaV7lsKscFUvxjoBFesCwX3v015Xz_Y5f9rb4-BELsdatpU7r/exec";
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwokvr27wq_gM6yZTFaWFYjnE30xaCvVA95TPGL6Mzdh2gyUjxspFvuVbwTFQXm7o2R/exec";
 
         function App() {
             const [customers, setCustomers] = useState([]);
@@ -49,14 +49,29 @@
                 return parseFloat(clean) || 0;
             };
 
+            // 🛠️ แก้บั๊กที่ 2: ปรับปรุงการสแกนหา Key คอลัมน์ให้แม่นยำ ไม่ให้คำว่า "paid" โดนฉุดไปเข้า "id"
             const getValueIgnoreCase = (obj, targetKey, defaultValue = 0) => {
                 if (!obj) return defaultValue;
                 const keys = Object.keys(obj);
-                const cleanTarget = targetKey.toLowerCase().replace(/[^a-z0-9]/g, '');
+                
+                const cleanTarget = targetKey.toLowerCase().trim();
+
+                // ขั้นที่ 1: ตรวจหาแบบตรงตัวเป๊ะๆ ก่อน (เพื่อความปลอดภัยที่สุด)
+                const exactKey = keys.find(k => k.toLowerCase().trim() === cleanTarget);
+                if (exactKey && obj[exactKey] !== undefined && obj[exactKey] !== null) {
+                    return obj[exactKey];
+                }
+
+                // ขั้นที่ 2: ถ้าไม่เจอตรงๆ ค่อยสแกนหาคีย์ที่ "ครอบคลุมอย่างสมเหตุสมผล" 
+                // โดยแก้ไม่ใช้แค่ .includes ทั่วไปที่ทำให้ "id" แฝงไปกินพื้นที่คนอื่น
                 const foundKey = keys.find(k => {
-                    const cleanKey = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const cleanKey = k.toLowerCase().trim();
+                    // ตรวจเช็กคีย์ยอดนิยมเพื่อป้องกันการชนกันเอง
+                    if (cleanTarget === "id" && cleanKey !== "id") return false; 
+                    if (cleanTarget === "paid" && (cleanKey.includes("id") && !cleanKey.includes("paid"))) return false;
                     return cleanKey.includes(cleanTarget) || cleanTarget.includes(cleanKey);
                 });
+
                 if (foundKey && obj[foundKey] !== undefined && obj[foundKey] !== null && obj[foundKey] !== "") {
                     return obj[foundKey];
                 }
@@ -87,12 +102,13 @@
                     return resData.status === "success";
                 } catch (error) {
                     console.error("Post Error:", error);
-                    return true; // รองรับกรณี redirect สำเร็จแต่เกิดข้อจำกัดภายในบราวเซอร์
+                    return true; 
                 } finally {
                     setLoading(false);
                 }
             };
 
+            // 🛠️ ฝั่งสัญญารองรับการGen ID ใหม่แบบสุ่มจากหลังบ้านแล้ว หน้าบ้านส่งค่าไปตามปกติ
             const handleAddCustomer = async (e) => {
                 e.preventDefault();
                 setShowAddModal(false);
@@ -474,7 +490,7 @@
             );
         }
 
-        const root = royaltyElement = ReactDOM.createRoot(document.getElementById('root'));
+        const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
 </body>
