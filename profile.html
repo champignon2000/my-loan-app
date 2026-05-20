@@ -17,7 +17,7 @@
         const { useState, useEffect } = React;
 
         // ⚠️ อย่าลืมใส่ลิงก์ Web App URL (Apps Script) ของคุณที่นี่
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzzLq_tmiOUFVyxcPfIeRiOnm0zWhhGIpsvCn0sR4Q2GJrifIipU4oELWjVeXkxXMA_/exec";
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbqY5H6Cc1SEKwFqoeaV7lsKscFUvxjoBFesCwX3v015Xz_Y5f9rb4-BELsdatpU7r/exec";
 
         function App() {
             const [customers, setCustomers] = useState([]);
@@ -68,23 +68,27 @@
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ action: "recordPayment", id: selectedUser.id, amount: parseFloat(payAmount) })
                     });
-                    alert(`✅ บันทึกยอดสำเร็จ!`);
+                    
+                    alert(`✅ ส่งคำสั่งบันทึกยอดสำเร็จ! กำลังอัปเดตข้อมูล...`);
                     setPayAmount("");
-                    setTimeout(loadAllData, 1000);
+                    setTimeout(loadAllData, 1500);
                 } catch(err) { console.error(err); }
             };
 
             const handleCloseFloatLoan = async (cust) => {
-                if (!confirm(`🚨 ยืนยันการ "ปิดยอดเงินต้นถาวร" ของคุณ ${cust.name}?\nระบบจะตัดยอดค้างใน Google Sheets เป็น 0 และจบสัญญานี้ทันที`)) return;
+                const cId = getValueFromSheet(cust, "id").toString();
+                const cName = getValueFromSheet(cust, "name").toString();
+
+                if (!confirm(`🚨 ยืนยันการ "ปิดยอดเงินต้นถาวร" ของคุณ ${cName}?\nระบบจะตัดยอดค้างใน Google Sheets เป็น 0 และจบสัญญานี้ทันที`)) return;
                 try {
                     await fetch(SCRIPT_URL, {
                         method: "POST",
                         mode: "no-cors",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ action: "closeFloatLoan", id: cust.id })
+                        body: JSON.stringify({ action: "closeFloatLoan", id: cId })
                     });
-                    alert(`🎉 ปิดสัญญาเงินต้นสำเร็จเสร็จสิ้นครับ!`);
-                    setTimeout(loadAllData, 1000);
+                    alert(`🎉 ส่งคำสั่งปิดสัญญาเงินต้นสำเร็จเสร็จสิ้นครับ! กำลังอัปเดตข้อมูล...`);
+                    setTimeout(loadAllData, 1500);
                 } catch(err) { console.error(err); }
             };
 
@@ -133,8 +137,8 @@
                                 const cId = getValueFromSheet(c, "id").toString();
                                 const cName = getValueFromSheet(c, "name").toString();
                                 
-                                // 🔒 แปลงคำให้เป็นตัวพิมพ์เล็กและลบช่องว่างทิ้งทั้งหมด ป้องกันคำว่า float เพี้ยน
-                                const rawType = getValueFromSheet(c, "loanType").toString().toLowerCase().replace(/\s+/g, '');
+                                // แมปคีย์ชื่อ "loantype" ให้เป็นตัวพิมพ์เล็กตรงตามที่เก็บใน Apps Script (data.loanType ส่งไปบันทึกเป็นคอลัมน์ที่ 3 ชื่อคีย์ loantype)
+                                const rawType = getValueFromSheet(c, "loantype").toString().toLowerCase().replace(/\s+/g, '');
                                 
                                 const cTotalAmount = getValueFromSheet(c, "total_amount", 0);
                                 const cRemainingBalance = getValueFromSheet(c, "remaining_balance", 0); 
@@ -143,7 +147,9 @@
                                 const cPaidAmount = getValueFromSheet(c, "paid_amount", 0);
 
                                 const isPaid = checkIfPaidSuccess(c);
-                                const isFloat = rawType === "float"; // แมปคำว่า float ตัวพิมพ์เล็กตรงๆ จากคอลัมน์ C
+                                
+                                // ตรวจสอบประเภทสัญญา: ถ้าไม่ระบุว่าเป็น daily ระบบฝั่ง Apps Script จะคำนวณแบบดอกลอย (isFloat)
+                                const isFloat = rawType !== "daily"; 
 
                                 return (
                                     <div key={cId} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
@@ -168,15 +174,15 @@
 
                                         {/* พื้นที่แสดงปุ่มกด */}
                                         <div className="flex flex-col gap-2 mt-2">
-                                            {/* ปุ่มส่งเงินปกติ (ให้กดได้ถ้าสถานะในชีตไม่ได้พิมพ์ว่า จ่ายแล้ว) */}
+                                            {/* ปุ่มส่งเงินปกติ */}
                                             {!isPaid && (
                                                 <button onClick={() => { setSelectedUser({id: cId, name: cName}); setPayAmount(cCyclePayment); setShowPayModal(true); }} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs transition-all cursor-pointer">
                                                     🪙 {isFloat ? "บันทึกการส่งดอกรอบนี้" : "บันทึกการชำระค่างวด"}
                                                 </button>
                                             )}
                                             
-                                            {/* 🚨 ปุ่มปิดยอดเงินต้นถาวร: ปลดล็อกเงื่อนไขซับซ้อนออกทั้งหมด ตราบใดที่เป็นสัญญากลุ่ม float ปุ่มนี้จะขึ้นค้างไว้ให้กดเสมอไม่มีโดนซ่อนครับ */}
-                                            {isFloat && (
+                                            {/* ปุ่มปิดยอดเงินต้นถาวร สำหรับสัญญารูปแบบดอกลอย (และยังไม่ได้เปลี่ยนสถานะเป็นจ่ายแล้ว) */}
+                                            {isFloat && !isPaid && (
                                                 <button onClick={() => handleCloseFloatLoan(c)} className="w-full bg-red-600 hover:bg-red-700 text-white font-black py-3 rounded-xl text-xs shadow-md transition-all cursor-pointer border border-red-700 block text-center">
                                                     🚨 ปิดยอดเงินต้นถาวร (จบสัญญา)
                                                 </button>
