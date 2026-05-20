@@ -16,8 +16,8 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // ⚠️ ลิงก์ Web App URL ตัวล่าสุดของ Google Apps Script
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwokvr27wq_gM6yZTFaWFYjnE30xaCvVA95TPGL6Mzdh2gyUjxspFvuVbwTFQXm7o2R/exec";
+        // ⚠️ สลับเอาลิงก์ Web App URL ตัวใหม่ล่าสุดจากข้อดีพล็อยขั้นตอนด้านบนมาใส่ที่นี่แทน
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxpTsJ4BDCzpzRUiS_mijoRS5vxbSbYZlKsoANl_gX-qgFWJH6li2gethMj9BlJiR6S/exec";
 
         function App() {
             const [customers, setCustomers] = useState([]);
@@ -25,12 +25,12 @@
             const [search, setSearch] = useState("");
             const [tab, setTab] = useState("all");
             
-            // สถานะเปิด/ปิดหน้าต่าง Modal
+            // สถานะตัวเปิด/ปิดหน้าต่าง Modal ป็อปอัพ
             const [showAddModal, setShowAddModal] = useState(false);
             const [showPayModal, setShowPayModal] = useState(false);
             const [showEditModal, setShowEditModal] = useState(false); 
             
-            // ข้อมูลสำหรับบันทึก/แก้ไข
+            // ชุดเก็บข้อมูลฟอร์ม
             const [selectedUser, setSelectedUser] = useState(null);
             const [payAmount, setPayAmount] = useState("");
             const [editId, setEditId] = useState("");
@@ -46,7 +46,7 @@
                 loadAllData(); 
             }, []);
 
-            // ฟังก์ชันคลีนตัวเลขเพื่อความปลอดภัยในการคำนวณแดชบอร์ด
+            // ล้างฟอร์แมตตัวเลขคอมมาเพื่อใช้ในการบวกคำนวณแดชบอร์ดอย่างแม่นยำ
             const parseCleanFloat = (val) => {
                 if (val === undefined || val === null || val === "") return 0;
                 if (typeof val === 'number') return val;
@@ -54,29 +54,27 @@
                 return parseFloat(clean) || 0;
             };
 
-            // 🛠️ ตรรกะจับคู่และดึงค่าจาก Google Sheets (แก้ปัญหาคีย์ไม่ตรงและปิดบั๊กสแกนคำ)
+            // ฟังก์ชันตรวจสอบแมตช์คีย์ข้อมูลระหว่าง โค้ด กับ หัวตาราง Google Sheets ของคุณ
             const getValueIgnoreCase = (obj, targetKey, defaultValue = 0) => {
                 if (!obj) return defaultValue;
                 
-                // ตาราง Mapping: คีย์ในโค้ด (ซ้าย) -> ชื่อคอลัมน์ใน Google Sheets ของคุณ (ขวา)
+                // ตารางเชื่อมข้อมูลคอลัมน์ (ซ้าย=โค้ด , ขวา=หัวคอลัมน์ใน Sheets ของคุณเป๊ะๆ)
                 const map = {
                     "id": "id",
                     "name": "name",
                     "loantype": "loanType",
                     "principal": "principal",
-                    "interest": "interest_rate",   // ตรงกับคอลัมน์ E
-                    "total": "total_amount",       // ตรงกับคอลัมน์ F
-                    "days": "days_count",          // ตรงกับคอลัมน์ G
-                    "cycle": "cycle_payment",      // ตรงกับคอลัมน์ H
-                    "paid": "paid_amount",         // ตรงกับคอลัมน์ I
-                    "balan": "remaining_balance",  // ตรงกับคอลัมน์ J
-                    "status": "status",            // ตรงกับคอลัมน์ K
-                    "date": "loan_date"            // ตรงกับคอลัมน์ L
+                    "interest": "interest_rate",   // คอลัมน์ E
+                    "total": "total_amount",       // คอลัมน์ F
+                    "days": "days_count",          // คอลัมน์ G
+                    "cycle": "cycle_payment",      // คอลัมน์ H
+                    "paid": "paid_amount",         // คอลัมน์ I
+                    "balan": "remaining_balance",  // คอลัมน์ J
+                    "status": "status",            // คอลัมน์ K
+                    "date": "loan_date"            // คอลัมน์ L
                 };
 
                 const actualKey = map[targetKey] || targetKey;
-                
-                // ค้นหาคีย์แบบ Case-Insensitive (ไม่สนพิมพ์เล็ก-พิมพ์ใหญ่เพื่อความปลอดภัย)
                 const foundKey = Object.keys(obj).find(k => k.toLowerCase() === actualKey.toLowerCase());
                 
                 if (foundKey !== undefined && obj[foundKey] !== undefined && obj[foundKey] !== null && obj[foundKey] !== "") {
@@ -85,22 +83,22 @@
                 return defaultValue;
             };
 
-            // โหลดข้อมูลทั้งหมดจาก Google Sheets
+            // เรียกดึงข้อมูลทั้งหมดจาก Google Sheets ผ่าน API หลังบ้าน
             const loadAllData = async () => {
                 setLoading(true);
                 try {
                     const resCust = await fetch(`${SCRIPT_URL}?action=getCustomers`);
                     const dataCust = await resCust.json();
-                    console.log("Data loaded from sheet:", dataCust); // บันทึก Log เพื่อตรวจสอบโครงสร้างผ่าน F12
+                    console.log("โครงสร้างข้อมูลที่โหลดจริงจากชีต:", dataCust);
                     setCustomers(Array.isArray(dataCust) ? dataCust : []);
                 } catch (err) { 
-                    console.error("Error loading data:", err);
+                    console.error("การโหลดข้อมูลจาก API ล้มเหลว:", err);
                 } finally {
                     setLoading(false);
                 }
             };
 
-            // ฟังก์ชันส่ง Request แบบ POST ไปยังหลังบ้าน Apps Script
+            // ฟังก์ชันกลางสำหรับการยิง Request สั่งบันทึกข้อมูล (POST)
             const sendPostRequest = async (payload) => {
                 setLoading(true);
                 try {
@@ -111,14 +109,14 @@
                     const resData = await response.json();
                     return resData.status === "success";
                 } catch (error) {
-                    console.error("Post Error:", error);
+                    console.error("การส่งข้อมูล POST มีปัญหา:", error);
                     return true; 
                 } finally {
                     setLoading(false);
                 }
             };
 
-            // ดำเนินการออกสัญญาใหม่
+            // ออกบิลเปิดสัญญาเงินกู้ลูกค้าใหม่
             const handleAddCustomer = async (e) => {
                 e.preventDefault();
                 setShowAddModal(false);
@@ -140,7 +138,7 @@
                 setTimeout(loadAllData, 1000);
             };
 
-            // ดึงข้อมูลเดิมมาหยอดใส่ช่องฟอร์มเพื่อเตรียมแก้ไข
+            // ดึงข้อมูลลูกหนี้คนนั้นๆ มาหยอดใส่ฟอร์มเตรียมแก้ไข
             const openEditModal = (c) => {
                 const cId = getValueIgnoreCase(c, "id", "").toString();
                 const cName = getValueIgnoreCase(c, "name", "").toString();
@@ -162,7 +160,7 @@
                 setShowEditModal(true);
             };
 
-            // บันทึกข้อมูลที่แก้ไขส่งไป Google Sheets
+            // ส่งข้อมูลที่แก้ไขไปอัปเดตลง Google Sheets
             const handleEditCustomer = async (e) => {
                 e.preventDefault();
                 setShowEditModal(false);
@@ -180,16 +178,16 @@
                     loanDate
                 };
                 await sendPostRequest(payload);
-                alert("📝 แก้ไขข้อมูลสัญญาเรียบร้อยแล้ว!");
+                alert("📝 แก้ไขข้อมูลเรียบร้อยแล้ว!");
                 resetForm();
                 setTimeout(loadAllData, 1000);
             };
 
-            // บันทึกประวัติการเก็บเงินงวด/ดอกเบี้ย
+            // บันทึกการชำระเงินของลูกหนี้
             const handlePayment = async (e) => {
                 e.preventDefault();
                 if (!payAmount || parseFloat(payAmount) <= 0) return;
-                if (!confirm(`🪙 ยืนยันการชำระเงินจำนวน ${parseFloat(payAmount).toLocaleString()} บาท ใช่หรือไม่?`)) return;
+                if (!confirm(`🪙 ยืนยันบันทึกเก็บยอดจำนวน ${parseFloat(payAmount).toLocaleString()} บาท หรือไม่?`)) return;
                 
                 setShowPayModal(false);
                 const payload = { 
@@ -198,30 +196,30 @@
                     amount: parseFloat(payAmount) 
                 };
                 await sendPostRequest(payload);
-                alert(`✅ บันทึกยอดชำระเรียบร้อย!`);
+                alert(`✅ บันทึกยอดชำระสำเร็จ!`);
                 setPayAmount("");
                 setTimeout(loadAllData, 1000);
             };
 
-            // ปิดยอดเงินต้น (สำหรับสัญญารูปแบบดอกลอย)
+            // หักดิบสำหรับสัญญาดอกลอย (เอาเงินก้อนมาคืนเพื่อจบสัญญา)
             const handleCloseFloatLoan = async (id, name) => {
-                if (!confirm(`🚨 ยืนยันให้ลูกหนี้หักดิบเอาเงินก้อนมา "ปิดยอดเงินต้นถาวร" ของคุณ ${name} ใช่หรือไม่?`)) return;
+                if (!confirm(`🚨 ยืนยันให้ลูกหนี้คนนี้หักดิบคืนเงินก้อนเพื่อ "ปิดยอดเงินต้นถาวร" ของคุณ ${name} หรือไม่?`)) return;
                 const payload = { action: "closeFloatLoan", id: id };
                 await sendPostRequest(payload);
-                alert(`🎉 จบสัญญาปิดยอดถาวรของคุณ ${name} เรียบร้อยแล้ว!`);
+                alert(`🎉 จบสัญญาปิดยอดถาวรของคุณ ${name} สำเร็จ!`);
                 setTimeout(loadAllData, 1000);
             };
 
-            // ลบข้อมูลสัญญาถาวร
+            // ลบสัญญาลูกหนี้ถาวร
             const handleDeleteCustomer = async (id, name) => {
-                if (!confirm(`⚠️ คุณแน่ใจใช่ไหมที่จะลบสัญญาของ "${name}" (${id})?\nข้อมูลจะถูกลบออกถาวร!`)) return;
+                if (!confirm(`⚠️ ยืนยันที่จะลบข้อมูลสัญญาของคุณ "${name}" (${id}) ออกจากระบบอย่างถาวรใช่ไหม?`)) return;
                 const payload = { action: "deleteCustomer", id: id };
                 await sendPostRequest(payload);
-                alert("🗑️ ลบข้อมูลสัญญาออกจากระบบสำเร็จ!");
+                alert("🗑️ ลบข้อมูลสัญญาสำเร็จแล้ว!");
                 setTimeout(loadAllData, 1000);
             };
 
-            // ล้างค่าฟอร์มกลับเป็นค่าเริ่มต้น
+            // ล้างข้อมูลหน้าฟอร์มกลับไปเป็นค่าเริ่มต้น
             const resetForm = () => {
                 setEditId("");
                 setName(""); 
@@ -233,7 +231,7 @@
                 setLoanDate(new Date().toISOString().split('T')[0]);
             };
 
-            // จัดฟอร์แมตวันที่ให้รองรับ Input Type="date"
+            // ล้างฟอร์แมตข้อความวันที่ให้รองรับ Input HTML เสมอ
             const formatCleanDate = (dateString) => {
                 if (!dateString) return "";
                 try {
@@ -245,7 +243,7 @@
                 }
             };
 
-            // ตรรกะตรวจเช็กสัญญาที่ครบกำหนดส่งในแต่ละรอบวัน
+            // คำนวณเช็กว่าครบกำหนดชำระรอบวันตามตัวนับวันของชีตหรือไม่
             const isDueToday = (loanDateString, daysCount) => {
                 if (!loanDateString) return false;
                 const intervalDays = parseInt(daysCount) || 1;
@@ -257,7 +255,7 @@
                 return (diffDays > 0 && diffDays % intervalDays === 0);
             };
 
-            // กรองข้อมูลตามคำค้นหา (Search) และแท็บสถานะ (Tabs)
+            // กรองค้นหาข้อความและจัดการแสดงสลับแท็บเมนู
             const filtered = customers.filter(c => {
                 const cName = getValueIgnoreCase(c, "name", "").toString();
                 const cId = getValueIgnoreCase(c, "id", "").toString();
@@ -274,7 +272,7 @@
                 return true;
             });
 
-            // ประมวลผลผลรวมข้อมูลสถิติของระบบ (Dashboard)
+            // คํานวณตัวเลขและสถิติสะสมขึ้นบอร์ดแดชบอร์ดหน้าระบบ
             const summary = customers.reduce((acc, c) => {
                 acc.totalPrincipal += parseCleanFloat(getValueIgnoreCase(c, "principal", 0));
                 acc.totalInterest += parseCleanFloat(getValueIgnoreCase(c, "interest", 0));
@@ -286,7 +284,7 @@
             return (
                 <div className="max-w-md mx-auto min-h-screen flex flex-col bg-slate-50 shadow-2xl border-x border-slate-200">
                     
-                    {/* ส่วนของ Header และกล่องค้นหา */}
+                    {/* ด้านบนระบบ (Header และ ช่องค้นหา) */}
                     <div className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-4 sticky top-0 z-10 shadow-md">
                         <div className="flex justify-between items-center mb-3">
                             <h1 className="text-lg font-black tracking-tight">🚀 LoanLink Admin</h1>
@@ -300,44 +298,44 @@
                         </div>
                     </div>
 
-                    {/* ส่วนบอร์ดสรุปยอดสถิติการเงิน (Dashboard) */}
+                    {/* ตารางแสดงภาพรวม Dashboard สรุปยอดเงินทุน */}
                     <div className="p-3 bg-gradient-to-b from-indigo-50 to-slate-50 border-b border-slate-200">
                         <div className="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200/60">
-                            <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 block mb-2"><i className="fa-solid fa-chart-pie text-indigo-500 mr-1"></i> ภาพรวมเงินทุนสัญญา</span>
+                            <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 block mb-2"><i className="fa-solid fa-chart-pie text-indigo-500 mr-1"></i> ภาพรวมเงินทุนสัญญาทั้งหมด</span>
                             <div className="grid grid-cols-2 gap-2">
                                 <div className="bg-blue-50/60 rounded-xl p-2.5 border border-blue-100">
                                     <span className="text-[10px] text-blue-600 font-bold block">💰 เงินต้นปล่อยทั้งหมด</span>
                                     <strong className="text-base text-blue-900 font-black">{summary.totalPrincipal.toLocaleString()} บ.</strong>
                                 </div>
                                 <div className="bg-emerald-50/60 rounded-xl p-2.5 border border-emerald-100">
-                                    <span className="text-[10px] text-emerald-600 font-bold block">📈 ดอกเบี้ยตั้งรับ (รายวัน)</span>
+                                    <span className="text-[10px] text-emerald-600 font-bold block">📈 ดอกเบี้ยตั้งรับในระบบ</span>
                                     <strong className="text-base text-emerald-900 font-black">{summary.totalInterest.toLocaleString()} บ.</strong>
                                 </div>
                                 <div className="bg-purple-50/60 rounded-xl p-2.5 border border-purple-100">
-                                    <span className="text-[10px] text-purple-600 font-bold block">📥 ต้นทุนที่ดึงกลับได้แล้ว</span>
+                                    <span className="text-[10px] text-purple-600 font-bold block">📥 ต้นทุนรวมที่เก็บคืนแล้ว</span>
                                     <strong className="text-base text-purple-900 font-black">{summary.totalPaid.toLocaleString()} บ.</strong>
                                 </div>
                                 <div className="bg-rose-50/60 rounded-xl p-2.5 border border-rose-100">
-                                    <span className="text-[10px] text-rose-600 font-bold block">💸 ยอดเงินต้นค้างในระบบ</span>
+                                    <span className="text-[10px] text-rose-600 font-bold block">💸 ยอดเงินต้นค้างระบบตอนนี้</span>
                                     <strong className="text-base text-rose-600 font-black">{summary.totalRemaining.toLocaleString()} บ.</strong>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* แท็บสลับหมวดหมู่ตัวกรองสัญญาลูกหนี้ */}
+                    {/* เมนูแท็บแถบตัวเลือกเพื่อกรองสถานะ */}
                     <div className="grid grid-cols-3 gap-1 bg-white p-1.5 border-b border-slate-200">
                         <button onClick={() => setTab("all")} className={`py-2 text-xs font-bold rounded-lg ${tab === 'all' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500'}`}>ทั้งหมด ({customers.length})</button>
                         <button onClick={() => setTab("pending")} className={`py-2 text-xs font-bold rounded-lg ${tab === 'pending' ? 'bg-amber-50 text-amber-700' : 'text-slate-500'}`}>ต้องเก็บวันนี้</button>
                         <button onClick={() => setTab("paid")} className={`py-2 text-xs font-bold rounded-lg ${tab === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-500'}`}>ปิดสัญญาแล้ว</button>
                     </div>
 
-                    {/* รายการสัญญาลูกหนี้ทั้งหมด */}
+                    {/* กล่องรายการรายชื่อลูกหนี้กู้เงิน */}
                     <div className="flex-1 p-3 space-y-3 overflow-y-auto">
                         {loading ? (
-                            <div className="text-center py-20 text-slate-400"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-indigo-600 mb-3"></i></div>
+                            <div className="text-center py-20 text-slate-400"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-indigo-600 mb-3"></i> กำลังเรียกข้อมูล...</div>
                         ) : filtered.length === 0 ? (
-                            <div className="text-center py-20 text-slate-400 text-sm">📭 ไม่พบข้อมูลลูกหนี้</div>
+                            <div className="text-center py-20 text-slate-400 text-sm">📭 ไม่พบข้อมูลรายชื่อลูกหนี้ในระบบ</div>
                         ) : (
                             filtered.map(c => {
                                 const cId = getValueIgnoreCase(c, "id", "").toString();
@@ -368,17 +366,17 @@
                                             {cType === "daily" ? (
                                                 <>
                                                     <div>ยอดรวมสัญญา: <strong className="text-slate-900">{parseCleanFloat(cTotal).toLocaleString()} บ.</strong></div>
-                                                    <div>ชำระสะสมแล้ว: <strong className="text-emerald-600">{parseCleanFloat(cPaid).toLocaleString()} บ.</strong></div>
-                                                    <div className="col-span-2">ยอดหนี้คงค้าง: <strong className="text-rose-600 text-sm font-black">{parseCleanFloat(cRemaining).toLocaleString()} บ.</strong></div>
+                                                    <div>ชำระรวมสะสม: <strong className="text-emerald-600">{parseCleanFloat(cPaid).toLocaleString()} บ.</strong></div>
+                                                    <div className="col-span-2">ยอดหนี้เหลือสุทธิ: <strong className="text-rose-600 text-sm font-black">{parseCleanFloat(cRemaining).toLocaleString()} บ.</strong></div>
                                                 </>
                                             ) : (
                                                 <>
-                                                    <div>เงินต้นลอยอยู่: <strong className="text-slate-900 text-sm font-black">{parseCleanFloat(cRemaining).toLocaleString()} บ.</strong></div>
-                                                    <div>รับดอกสะสมแล้ว: <strong className="text-emerald-600">{parseCleanFloat(cPaid).toLocaleString()} บ.</strong></div>
+                                                    <div>เงินต้นลอยคงค้าง: <strong className="text-slate-900 text-sm font-black">{parseCleanFloat(cRemaining).toLocaleString()} บ.</strong></div>
+                                                    <div>รับดอกรวมแล้ว: <strong className="text-emerald-600">{parseCleanFloat(cPaid).toLocaleString()} บ.</strong></div>
                                                 </>
                                             )}
                                             <div className="bg-slate-50 col-span-2 p-2 rounded-xl mt-1 flex justify-between items-center border border-slate-100">
-                                                <span>💰 ยอดต่องวด: <strong className="text-indigo-600">{parseCleanFloat(cCycle).toLocaleString()} บ.</strong></span>
+                                                <span>💰 ยอดเก็บต่องวด: <strong className="text-indigo-600">{parseCleanFloat(cCycle).toLocaleString()} บ.</strong></span>
                                                 <span>รอบส่ง: <strong className="text-slate-700">ทุก {cDays} วัน</strong></span>
                                             </div>
                                         </div>
@@ -386,7 +384,7 @@
                                         {cStatus !== "จ่ายแล้ว" && (
                                             <div className="flex gap-2">
                                                 <button onClick={() => { setSelectedUser({id: cId, name: cName}); setPayAmount(cCycle); setShowPayModal(true); }} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl text-xs cursor-pointer">
-                                                    {cType === "float" ? "🪙 บันทึกเก็บดอกงวดนี้" : "🪙 เก็บยอดงวดนี้"}
+                                                    {cType === "float" ? "🪙 บันทึกเก็บดอกงวดนี้" : "🪙 เก็บค่างวดประจำวัน"}
                                                 </button>
                                                 {cType === "float" && (
                                                     <button onClick={() => handleCloseFloatLoan(cId, cName)} className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-2 rounded-xl text-xs cursor-pointer">🚨 ปิดต้นถาวร</button>
@@ -399,7 +397,7 @@
                         )}
                     </div>
 
-                    {/* หน้าต่างสระป็อปอัพ (Modal): ออกสัญญาเงินกู้ใหม่ */}
+                    {/* ป็อปอัพหน้าต่าง (Modal): ออกบิลสร้างสัญญากู้เงินชุดใหม่ */}
                     {showAddModal && (
                         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
                             <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -410,7 +408,7 @@
                                         <input type="text" required value={name} onChange={(e) => setName(e.target.value)} placeholder="กรอกชื่อ-นามสกุล" className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none" />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">ประเภทระบบเงินกู้</label>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">ประเภทเงินกู้ระบบ</label>
                                         <select value={loanType} onChange={(e) => setLoanType(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none">
                                             <option value="daily">รายวัน (ตัดต้นตัดดอก)</option>
                                             <option value="float">ดอกลอย</option>
@@ -428,39 +426,39 @@
                                     </div>
                                     <div className="grid grid-cols-2 gap-2">
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-500 mb-1">ระยะเวลาส่ง/รอบ (วัน)</label>
+                                            <label className="block text-xs font-bold text-slate-500 mb-1">ระยะเวลารอบเก็บ (วัน)</label>
                                             <input type="number" min="1" value={customDays} onChange={(e) => setCustomDays(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none" />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-500 mb-1">ยอดเก็บต่อรอบ (บาท)</label>
+                                            <label className="block text-xs font-bold text-slate-500 mb-1">ยอดส่งต่องวด (บาท)</label>
                                             <input type="number" required value={customCyclePayment} onChange={(e) => setCustomCyclePayment(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none" />
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">วันที่เริ่มต้นสัญญา</label>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">วันที่เริ่มต้นเปิดบิลสัญญา</label>
                                         <input type="date" value={loanDate} onChange={(e) => setLoanDate(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none" />
                                     </div>
                                     <div className="flex gap-2 pt-2">
                                         <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 bg-slate-100 text-slate-500 py-2.5 rounded-xl text-xs font-bold cursor-pointer">ยกเลิก</button>
-                                        <button type="submit" className="flex-1 bg-emerald-500 text-white py-2.5 rounded-xl text-xs font-bold cursor-pointer">บันทึกเปิดสัญญา</button>
+                                        <button type="submit" className="flex-1 bg-emerald-500 text-white py-2.5 rounded-xl text-xs font-bold cursor-pointer">บันทึกเปิดบิล</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
                     )}
 
-                    {/* หน้าต่างป็อปอัพ (Modal): แก้ไขข้อมูลสัญญาเดิม */}
+                    {/* ป็อปอัพหน้าต่าง (Modal): แก้ไขโครงสร้างข้อมูลเดิม */}
                     {showEditModal && (
                         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
                             <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
-                                <h3 className="text-base font-black text-slate-800 mb-4">แก้ไขข้อมูลเอกสารสัญญา</h3>
+                                <h3 className="text-base font-black text-slate-800 mb-4">แก้ไขข้อตกลงเอกสารสัญญา</h3>
                                 <form onSubmit={handleEditCustomer} className="space-y-3">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 mb-1">ชื่อ-นามสกุล ลูกหนี้</label>
                                         <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none" />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">ประเภทเงินกู้</label>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">ประเภทเงื่อนไขระบบ</label>
                                         <select value={loanType} onChange={(e) => setLoanType(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none">
                                             <option value="daily">รายวัน (ตัดต้นตัดดอก)</option>
                                             <option value="float">ดอกลอย</option>
@@ -477,40 +475,40 @@
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">ระยะเวลา (วัน)</label>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">รอบระยะส่ง (วัน)</label>
                                         <input type="number" min="1" value={customDays} onChange={(e) => setCustomDays(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none" />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">ยอดเก็บต่อรอบ (บาท)</label>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">ยอดจ่ายต่องวด (บาท)</label>
                                         <input type="number" required value={customCyclePayment} onChange={(e) => setCustomCyclePayment(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none" />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">วันที่กู้</label>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">วันที่ปล่อยกู้เดิม</label>
                                         <input type="date" value={loanDate} onChange={(e) => setLoanDate(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none" />
                                     </div>
                                     <div className="flex gap-2 pt-2">
                                         <button type="button" onClick={() => { setShowEditModal(false); resetForm(); }} className="flex-1 bg-slate-100 text-slate-500 py-2.5 rounded-xl text-xs font-bold cursor-pointer">ยกเลิก</button>
-                                        <button type="submit" className="flex-1 bg-amber-500 text-white py-2.5 rounded-xl text-xs font-bold cursor-pointer">บันทึกการแก้ไข</button>
+                                        <button type="submit" className="flex-1 bg-amber-500 text-white py-2.5 rounded-xl text-xs font-bold cursor-pointer">อัปเดตการแก้ไข</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
                     )}
 
-                    {/* หน้าต่างป็อปอัพ (Modal): บันทึกการรับชำระเงินค่างวด */}
+                    {/* ป็อปอัพหน้าต่าง (Modal): ชำระเงินรับค่างวดสะสม */}
                     {showPayModal && (
                         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
                             <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl">
-                                <h3 className="text-base font-black text-slate-800 mb-2">บันทึกการชำระเงิน</h3>
-                                <p className="text-xs text-slate-500 mb-4">ลูกหนี้: <span className="text-slate-800 font-bold">{selectedUser?.name}</span></p>
+                                <h3 className="text-base font-black text-slate-800 mb-2">บันทึกจ่ายเงินลูกหนี้</h3>
+                                <p className="text-xs text-slate-500 mb-4">รายชื่อ: <span className="text-slate-800 font-bold">{selectedUser?.name}</span></p>
                                 <form onSubmit={handlePayment} className="space-y-3">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">จำนวนเงินที่จ่าย (บาท)</label>
-                                        <input type="number" required value={payAmount} onChange={(e) => setPayAmount(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-500" placeholder="ระบุจำนวนเงิน" />
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">ยอดเงินที่ชำระจริง (บาท)</label>
+                                        <input type="number" required value={payAmount} onChange={(e) => setPayAmount(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-500" placeholder="ระบุตัวเลขเงินทุน" />
                                     </div>
                                     <div className="flex gap-2 pt-2">
                                         <button type="button" onClick={() => { setShowPayModal(false); setPayAmount(""); }} className="flex-1 bg-slate-100 text-slate-500 py-2.5 rounded-xl text-xs font-bold cursor-pointer">ยกเลิก</button>
-                                        <button type="submit" className="flex-1 bg-indigo-600 text-white py-2.5 rounded-xl text-xs font-bold cursor-pointer">ยืนยันชำระเงิน</button>
+                                        <button type="submit" className="flex-1 bg-indigo-600 text-white py-2.5 rounded-xl text-xs font-bold cursor-pointer">ยืนยันทำรายการ</button>
                                     </div>
                                 </form>
                             </div>
